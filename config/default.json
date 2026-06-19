@@ -1,0 +1,23 @@
+{
+  "width_mm": 80.0,
+  "height_mm": 60.0,
+  "max_colors": 6,
+  "hoop": {
+    "w": 200,
+    "h": 200
+  },
+  "fill": {
+    "spacing_mm": 0.4,
+    "angle_deg": 45,
+    "underlay": true
+  },
+  "satin": {
+    "min_width_mm": 1.0,
+    "max_width_mm": 8.0,
+    "density_mm": 0.4
+  },
+  "pull_compensation_mm": 0.2,
+  "min_stitch_mm": 0.5,
+  "trim_jumps": true,
+  "output_format": "dst"
+}
