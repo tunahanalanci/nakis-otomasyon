@@ -1,25 +1,46 @@
-"""Colour separation: produce a binary mask per palette entry."""
+"""Colour separation: produce a boolean binary mask per palette entry."""
 
 from __future__ import annotations
 
+import cv2
 import numpy as np
 
 
-def masks_from_labels(label_map: np.ndarray, n_colors: int) -> list[np.ndarray]:
+def masks_from_labels(
+    label_map: np.ndarray,
+    n_colors: int,
+) -> list[np.ndarray]:
     """Return one boolean HxW mask per colour index in *label_map*.
 
-    Mask order matches the palette order from :mod:`src.colors`.
+    Background pixels (label == -1) are False in every mask.
+    Mask order matches the palette order from :mod:`src.colors`
+    (index 0 = dominant colour).
 
-    TODO: optionally merge thin isolated islands into neighbouring colour regions.
-    TODO: apply morphological closing to fill small holes inside each mask.
+    Parameters
+    ----------
+    label_map : HxW int32 array as returned by :func:`src.colors.quantise`.
+    n_colors  : number of colour entries in the palette.
     """
-    raise NotImplementedError
+    return [label_map == i for i in range(n_colors)]
 
 
 def clean_mask(mask: np.ndarray, min_area_px: int = 50) -> np.ndarray:
-    """Remove connected components smaller than *min_area_px* from *mask*.
+    """Remove foreground connected components whose area < *min_area_px*.
 
-    TODO: use cv2.connectedComponentsWithStats for component labelling.
-    TODO: expose min_area_px through Config (derived from min_stitch_mm).
+    Uses 8-connectivity so diagonally-touching blobs are one component.
+    Returns a cleaned boolean HxW mask.
+
+    Parameters
+    ----------
+    mask        : boolean or uint8 HxW array.
+    min_area_px : components smaller than this pixel count are discarded.
+                  Derive from Config: round((min_stitch_mm * px_per_mm) ** 2).
     """
-    raise NotImplementedError
+    n_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
+        mask.astype(np.uint8), connectivity=8
+    )
+    cleaned = np.zeros(mask.shape, dtype=bool)
+    for label in range(1, n_labels):        # label 0 = OpenCV background
+        if stats[label, cv2.CC_STAT_AREA] >= min_area_px:
+            cleaned[labels == label] = True
+    return cleaned
