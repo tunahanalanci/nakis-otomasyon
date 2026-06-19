@@ -29,23 +29,40 @@ pip install -r requirements.txt
 python cli.py logo.png --width 80 --height 60 --colors 4 --out out/
 ```
 
+USB'ye otomatik kopyalama:
+
+```bash
+python cli.py logo.png --width 80 --height 60 --out out/ --usb E:\\ --usb-layout EMB
+```
+
 ### Tüm seçenekler
 
 ```
-usage: nakis [-h] [--width MM] [--height MM] [--colors N] [--config PATH] [--out DIR] png
-
-PNG → DST embroidery automation for Tajima industrial machines.
+usage: nakis [-h] [--width MM] [--height MM] [--colors N] [--config PATH]
+             [--out DIR] [--usb PATH] [--usb-layout LAYOUT] [--debug] png
 
 positional arguments:
-  png            Input PNG file path
+  png                  Input PNG file path
 
 options:
-  --width MM     Design width in mm (overrides config)
-  --height MM    Design height in mm (overrides config)
-  --colors N     Maximum number of thread colours (overrides config)
-  --config PATH  JSON config file (default: config/default.json)
-  --out DIR      Output directory (default: out/)
+  --width MM           Design width in mm (overrides config)
+  --height MM          Design height in mm (overrides config)
+  --colors N           Maximum number of thread colours (overrides config)
+  --config PATH        JSON config file (default: config/default.json)
+  --out DIR            Output directory (default: out/)
+  --usb PATH           USB drive root path; copies DST + report + preview
+  --usb-layout LAYOUT  'root' = USB root, any other string = subdirectory
+                       (e.g. 'PATTERN', 'EMB'). Default: root
+  --debug              Save intermediate colour-reduced PNG to --out
 ```
+
+### Çıktılar
+
+| Dosya | Açıklama |
+|-------|----------|
+| `out/<isim>.dst` | Tajima DST dosyası |
+| `out/<isim>_preview.png` | Dikiş yolu önizlemesi |
+| `out/renk_sirasi.txt` | Renk sırası raporu (operatör kılavuzu) |
 
 ## Testler
 
@@ -58,14 +75,14 @@ pytest -q
 | Faz | Kapsam | Durum |
 |-----|--------|-------|
 | 0 | İskelet, CI, paket yapısı | ✅ Tamamlandı |
-| 1 | Ön işleme: arka plan silme, ölçekleme, gürültü | 🔲 Bekliyor |
-| 2 | Renk azaltma (k-means) + palet raporu | 🔲 Bekliyor |
-| 3 | Renk maskeleme + vektörizasyon (Shapely) | 🔲 Bekliyor |
-| 4 | Fill stitch motoru (tarama + underlay) | 🔲 Bekliyor |
-| 5 | Satin stitch motoru (medyal eksen) | 🔲 Bekliyor |
-| 6 | Optimizasyon: sıra, jump, trim | 🔲 Bekliyor |
-| 7 | DST dışa aktarım (pyembroidery) + doğrulama | 🔲 Bekliyor |
-| 8 | Önizleme PNG + USB yazıcı | 🔲 Bekliyor |
+| 1 | Ön işleme: arka plan silme, ölçekleme, gürültü | ✅ Tamamlandı |
+| 2 | Renk azaltma (k-means) + palet raporu | ✅ Tamamlandı |
+| 3 | Renk maskeleme + vektörizasyon (Shapely) | ✅ Tamamlandı |
+| 4 | Fill stitch motoru (tarama + underlay) | ✅ Tamamlandı |
+| 5 | Satin stitch motoru (medyal eksen) | ✅ Tamamlandı |
+| 6 | Optimizasyon: sıra, jump, trim | ✅ Tamamlandı |
+| 7 | DST dışa aktarım (pyembroidery) + doğrulama | ✅ Tamamlandı |
+| 8 | Önizleme PNG + USB yazıcı | ✅ Tamamlandı |
 
 ## Faz 0: USB Testi (Tajima Makine Doğrulaması)
 

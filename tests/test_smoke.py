@@ -76,22 +76,28 @@ def test_config_loads_default():
     assert conf.trim_jumps is True
 
 
-def test_pipeline_raises_not_implemented(tmp_path):
-    """Stages 1-2 complete; stage 3+ must raise NotImplementedError."""
+def test_pipeline_runs_to_completion(tmp_path):
+    """Complete pipeline must produce a valid DST without raising."""
     import numpy as np
     from PIL import Image as PilImage
     from src.config import load
     from src.pipeline import run
 
-    # Minimal 2-colour synthetic PNG so stage 1 (preprocess) succeeds
-    arr = np.zeros((60, 80, 3), dtype=np.uint8)
-    arr[:30, :] = [255, 0, 0]
-    arr[30:, :] = [0, 0, 255]
+    # Minimal 2-colour synthetic PNG (small so the test stays fast)
+    arr = np.zeros((40, 60, 3), dtype=np.uint8)
+    arr[:20, :] = [200, 40, 40]
+    arr[20:, :] = [40, 80, 200]
     png_path = tmp_path / "test.png"
     PilImage.fromarray(arr).save(str(png_path))
 
     conf = load(Path(__file__).parent.parent / "config" / "default.json")
-    conf.max_colors = 2
+    conf.max_colors  = 2
+    conf.width_mm    = 30.0
+    conf.height_mm   = 20.0
+    # Coarse settings for speed
+    conf.fill.spacing_mm = 2.0
+    conf.fill.underlay   = False
 
-    with pytest.raises(NotImplementedError):
-        run(str(png_path), conf, str(tmp_path / "out"))
+    result = run(str(png_path), conf, str(tmp_path / "out"))
+    assert result.dst_path.exists()
+    assert result.preview_path.exists()
