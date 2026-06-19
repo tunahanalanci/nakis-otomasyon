@@ -67,6 +67,60 @@ pytest -q
 | 7 | DST dışa aktarım (pyembroidery) + doğrulama | 🔲 Bekliyor |
 | 8 | Önizleme PNG + USB yazıcı | 🔲 Bekliyor |
 
+## Faz 0: USB Testi (Tajima Makine Doğrulaması)
+
+Bu adım, pipeline tamamlanmadan önce makineyi ve iş akışını bilinen bir geometriyle doğrular.
+
+### 1. Test dosyasını üret
+
+```bash
+python scripts/make_test_dst.py
+```
+
+Konsol çıktısı:
+```
+Dikis sayisi : 162
+Renk degisimi: 1  (2 blok)
+Sinirlar     : 40.0 x 40.0 mm
+```
+
+`out/test_kare.dst` ve `out/test_kare.png` oluşur.
+PNG'yi açarak deseni görsel olarak doğrula: dış çerçeve siyah koşu dikiş, iç dolu kare kırmızı tatami dolgu olmalı.
+
+### 2. USB'ye kopyala
+
+DST dosyasını FAT32 formatlı USB belleğe kopyala.
+Tajima modeline göre beklenen klasör/isim yapısı:
+
+| Model ailesi | USB klasörü | Dosya adı kuralı |
+|---|---|---|
+| TFMX / TMEX | Kök dizin (`/`) | 8.3 format (örn. `TEST_KAR.DST`) |
+| TME-SC / TME-DC | `/DESIGN/` | Uzun isim desteklenir |
+| SAI serisi | `/EMB/` | `.DST` uzantısı zorunlu |
+
+> **Not:** Makineni test ettikten sonra hangi klasörde ve hangi isimle göründüğünü buraya yaz — USB yerleşimi modele göre değişir ve ilerideki `usb_writer.py` implementasyonunda kullanılacak.
+
+### 3. Makine kontrolü
+
+Makineyi kasnak boyutuna göre ayarla (en az 50×50 mm kasnak önerilir).
+Dosyayı yükle ve **gerçekten dik**. Aşağıdakileri doğrula:
+
+- [ ] Çerçeve boyutu doğru: 40×40 mm
+- [ ] Dolgu boyutu doğru: 20×20 mm (çerçeve ortasında)
+- [ ] Renk değişimi: makine 1. iplikten sonra durup operatörü bekliyor mu?
+- [ ] Dolgu dikiş yoğunluğu kabul edilebilir (kumaşta kıvrılma yok)
+- [ ] Başlangıç/bitiş ipliği güvenli; atlamalar minimal
+
+Makine testi sonuçlarını bu tabloya kaydet:
+
+| Kontrol | Sonuç |
+|---|---|
+| Gerçek çerçeve boyutu (cetvelle ölç) | ___ × ___ mm |
+| Dolgu kalitesi | |
+| Renk durması çalışıyor mu? | |
+| USB'de görünen klasör/dosya adı | |
+| Toplam dikiş süresi (sn) | |
+
 ## Yapılandırma
 
 `config/default.json` dosyasını düzenleyin veya `--config` ile farklı bir dosya belirtin:
