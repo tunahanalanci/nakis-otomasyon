@@ -76,10 +76,22 @@ def test_config_loads_default():
     assert conf.trim_jumps is True
 
 
-def test_pipeline_raises_not_implemented():
+def test_pipeline_raises_not_implemented(tmp_path):
+    """Stages 1-2 complete; stage 3+ must raise NotImplementedError."""
+    import numpy as np
+    from PIL import Image as PilImage
     from src.config import load
     from src.pipeline import run
 
+    # Minimal 2-colour synthetic PNG so stage 1 (preprocess) succeeds
+    arr = np.zeros((60, 80, 3), dtype=np.uint8)
+    arr[:30, :] = [255, 0, 0]
+    arr[30:, :] = [0, 0, 255]
+    png_path = tmp_path / "test.png"
+    PilImage.fromarray(arr).save(str(png_path))
+
     conf = load(Path(__file__).parent.parent / "config" / "default.json")
+    conf.max_colors = 2
+
     with pytest.raises(NotImplementedError):
-        run("dummy.png", conf, "out/")
+        run(str(png_path), conf, str(tmp_path / "out"))

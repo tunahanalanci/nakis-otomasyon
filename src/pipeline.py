@@ -4,39 +4,73 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+from PIL import Image
+
 from src.config import Config
+from src.preprocess import load_and_scale
+from src.colors import quantise, build_color_report
 
 
-def run(png_path: str | Path, cfg: Config, out_dir: str | Path) -> Path:
-    """Execute the full PNG → DST pipeline and return the path to the output DST file.
+def run(
+    png_path: str | Path,
+    cfg: Config,
+    out_dir: str | Path,
+    *,
+    debug: bool = False,
+) -> Path:
+    """Execute the full PNG -> DST pipeline and return the path to the DST file.
 
-    Stages (each stage is a TODO until its module is implemented):
+    Stages 1-2 are implemented.  Stages 3-10 raise NotImplementedError.
 
-    1. Preprocess  — load, scale, background removal, denoise
-    2. Colours     — k-means quantisation, build palette, colour report
-    3. Separate    — per-colour binary masks
-    4. Vectorize   — masks → Shapely polygons (px → mm)
-    5. Stitch gen  — fill / satin / running + underlay per polygon
-    6. Optimise    — colour ordering, jump minimisation, trim insertion
-    7. Export      — write DST via pyembroidery
-    8. Validate    — bounds, density, stitch count checks
-    9. Preview     — render preview PNG
-    10. USB write  — copy artefacts to USB (optional)
-
-    TODO: wire stage 1 (src.preprocess.load_and_scale + remove_background + denoise).
-    TODO: wire stage 2 (src.colors.quantise + build_color_report).
-    TODO: wire stage 3 (src.separate.masks_from_labels + clean_mask).
-    TODO: wire stage 4 (src.vectorize.mask_to_polygons + px_to_mm).
-    TODO: wire stage 5 — choose satin vs fill per polygon using satin.width_at().
-    TODO: wire stage 6 (src.optimize.order_colors + insert_trims + minimize_jumps).
-    TODO: wire stage 7 (src.export_dst.export).
-    TODO: wire stage 8 (src.validate.validate) and surface errors to caller.
-    TODO: wire stage 9 (src.validate.render_preview).
-    TODO: optionally wire stage 10 (src.usb_writer.find_usb + write_to_usb).
+    Parameters
+    ----------
+    png_path : path to the input PNG file.
+    cfg      : pipeline configuration.
+    out_dir  : directory for all output artefacts.
+    debug    : when True, save intermediate artefacts (colour-reduced PNG,
+               colour-order report) to out_dir before raising.
     """
-    out_dir = Path(out_dir)
+    out_dir  = Path(out_dir)
+    png_path = Path(png_path)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    dst_path = out_dir / (Path(png_path).stem + ".dst")
+    stem = png_path.stem
 
-    raise NotImplementedError("Pipeline stages not yet implemented — see TODO list above.")
+    # ── Stage 1: Preprocess ───────────────────────────────────────────────────
+    img_rgba, px_per_mm = load_and_scale(png_path, cfg)
+
+    # ── Stage 2: Colour quantisation ─────────────────────────────────────────
+    label_map, palette = quantise(img_rgba, cfg)
+
+    if debug:
+        _save_quantised_png(
+            label_map, palette,
+            out_dir / f"{stem}_debug_colors.png",
+        )
+        build_color_report(palette, out_dir / f"{stem}_color_report")
+
+    # ── Stages 3-10: not yet implemented ─────────────────────────────────────
+    # TODO: stage 3  — src.separate.masks_from_labels + clean_mask
+    # TODO: stage 4  — src.vectorize.mask_to_polygons + px_to_mm
+    # TODO: stage 5  — stitch generation (fill / satin / running + underlay)
+    # TODO: stage 6  — src.optimize.order_colors + insert_trims + minimize_jumps
+    # TODO: stage 7  — src.export_dst.export
+    # TODO: stage 8  — src.validate.validate + render_preview
+    # TODO: stage 9  — src.usb_writer (optional)
+    raise NotImplementedError("Pipeline stages 3-10 not yet implemented.")
+
+
+# ── Internal helpers ──────────────────────────────────────────────────────────
+
+def _save_quantised_png(
+    label_map: np.ndarray,
+    palette: list[tuple[int, int, int]],
+    path: Path,
+) -> None:
+    """Paint each label with its palette colour; background stays white."""
+    h, w   = label_map.shape
+    rgb    = np.full((h, w, 3), 255, dtype=np.uint8)
+    for idx, colour in enumerate(palette):
+        rgb[label_map == idx] = colour
+    Image.fromarray(rgb, "RGB").save(str(path))

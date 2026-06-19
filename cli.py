@@ -37,6 +37,15 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="DIR",
         help="Output directory (default: out/)",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help=(
+            "Save intermediate artefacts to --out: "
+            "colour-reduced PNG (<stem>_debug_colors.png) "
+            "and thread-order report (<stem>_color_report.txt/.png)."
+        ),
+    )
     return parser
 
 
@@ -53,7 +62,7 @@ def main() -> None:
     if args.colors is not None:
         conf.max_colors = args.colors
 
-    dst = pipeline.run(args.png, conf, args.out)
+    dst = pipeline.run(args.png, conf, args.out, debug=args.debug)
     print(f"Done: {dst}")
 
 
