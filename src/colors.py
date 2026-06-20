@@ -11,6 +11,7 @@ from sklearn.cluster import KMeans
 from src.config import Config
 
 _ALPHA_FG_THRESH: int = 127  # pixels with alpha > this are foreground
+_BG_BRIGHT_THRESH: int = 240  # RGB pixels with all channels > this = near-white background
 
 
 def quantise(
@@ -38,8 +39,9 @@ def quantise(
         fg_mask = img[:, :, 3] > _ALPHA_FG_THRESH
         rgb     = img[:, :, :3]
     else:
-        fg_mask = np.ones((h, w), dtype=bool)
         rgb     = img[:, :, :3]
+        # Treat near-white pixels (all channels > threshold) as background
+        fg_mask = ~np.all(rgb > _BG_BRIGHT_THRESH, axis=2)
 
     fg_pixels  = rgb[fg_mask].astype(np.float32)
     n_clusters = min(cfg.max_colors, len(fg_pixels))
