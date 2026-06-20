@@ -39,6 +39,7 @@ class Config:
     min_stitch_mm: float = 0.5
     trim_jumps: bool = True
     output_format: str = "dst"
+    dst_flip_y: bool = True   # flip Y at DST export so machine sees Y-up
 
 
 def load(path: str | Path) -> Config:
@@ -64,4 +65,5 @@ def load(path: str | Path) -> Config:
         min_stitch_mm=raw.get("min_stitch_mm", 0.5),
         trim_jumps=raw.get("trim_jumps", True),
         output_format=raw.get("output_format", "dst"),
+        dst_flip_y=raw.get("dst_flip_y", True),
     )

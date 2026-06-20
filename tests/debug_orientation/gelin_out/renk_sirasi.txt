@@ -1,0 +1,4 @@
+Renk Sirasi (makine operatoru icin):
+
+1 -> RGB(43,59,74)  [781 dikis]
+2 -> RGB(168,135,75)  [447 dikis]

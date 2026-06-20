@@ -34,6 +34,7 @@ class PipelineResult:
     bounds_mm:         tuple[float, float, float, float]  # minx miny maxx maxy
     validation:        ValidationReport
     palette:           list[tuple[int, int, int]]
+    blocks:            list[StitchBlock]   # stitch data in Y-down mm (for render/animation)
 
 
 def run(
@@ -106,9 +107,9 @@ def run(
     # ── 8. Validate + preview ─────────────────────────────────────────────────
     validation    = validate(export_stats.dst_path, cfg)
     preview_path  = render_preview(
-        export_stats.dst_path,
+        blocks,
+        palette,
         out_dir / f"{stem}_preview.png",
-        palette=palette,
     )
 
     # ── 9. Optional USB copy ──────────────────────────────────────────────────
@@ -131,6 +132,7 @@ def run(
         bounds_mm         = export_stats.bounds_mm,
         validation        = validation,
         palette           = palette,
+        blocks            = blocks,
     )
 
 

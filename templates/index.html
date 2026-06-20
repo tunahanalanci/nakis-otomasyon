@@ -532,7 +532,6 @@ let animCtx      = null;
 let animScale    = 3.0;  // px per mm
 let animMinX     = 0;
 let animMinY     = 0;
-let animMaxY     = 0;
 let animPad      = 16;
 
 function animInit(seq) {
@@ -543,15 +542,15 @@ function animInit(seq) {
   const pts = seq.filter(s => s.cmd === STITCH_CMD);
   if (!pts.length) return;
 
-  const xs   = pts.map(s => s[0]);
-  const ys   = pts.map(s => s[1]);
+  const xs   = pts.map(s => s.x);
+  const ys   = pts.map(s => s.y);
   animMinX   = Math.min(...xs);
   animMinY   = Math.min(...ys);
-  animMaxY   = Math.max(...ys);
   const maxX = Math.max(...xs);
+  const maxY = Math.max(...ys);
 
-  const designW = (maxX   - animMinX) * animScale + animPad * 2;
-  const designH = (animMaxY - animMinY) * animScale + animPad * 2;
+  const designW = (maxX - animMinX) * animScale + animPad * 2;
+  const designH = (maxY - animMinY) * animScale + animPad * 2;
 
   animCanvas.width  = Math.max(10, designW);
   animCanvas.height = Math.max(10, designH);
@@ -569,7 +568,7 @@ function animInit(seq) {
 function toPx(xMm, yMm) {
   return [
     (xMm - animMinX) * animScale + animPad,
-    (animMaxY - yMm) * animScale + animPad    // Y flip: DST Y-up → canvas Y-down
+    (yMm - animMinY) * animScale + animPad    // Y-down mm → Y-down canvas (no flip)
   ];
 }
 

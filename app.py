@@ -124,9 +124,33 @@ def generate():
     actual_w = round(maxx - minx, 1)
     actual_h = round(maxy - miny, 1)
 
+    # ── Build stitch sequence for canvas animation + GIF ─────────────────────
+    # Source: raw blocks in Y-down mm — same as preview renderer (single path).
+    # Format: [x_mm, y_mm, cmd(0=stitch,1=jump), block_idx, r, g, b]
+    # No Y-flip here; JS canvas toPx() and _build_gif both use Y-down directly.
+    _palette = result.palette or [(30, 30, 200)]
+    stitch_seq = []
+    for blk_obj in result.blocks:
+        r, g, b = _palette[blk_obj.color_idx % len(_palette)]
+        first = True
+        for x, y in blk_obj.points:
+            cmd = 1 if first else 0   # 1=jump (block start), 0=stitch
+            stitch_seq.append([round(x, 2), round(y, 2), cmd,
+                                blk_obj.color_idx, r, g, b])
+            first = False
+
+    # Persist for on-demand GIF generation (no need to re-run pipeline).
+    import json as _json
+    (job_dir / "stitch_seq.json").write_text(
+        _json.dumps(stitch_seq), encoding="utf-8"
+    )
+
     return jsonify({
-        "job_id":      job_id,
-        "preview_b64": preview_b64,
+        "job_id":        job_id,
+        "preview_b64":   preview_b64,
+        "stitch_seq":    stitch_seq,
+        "palette":       list(result.palette),
+        "bounds_mm":     [minx, miny, maxx, maxy],
         "stats": {
             "total_stitches": result.total_stitches,
             "n_color_blocks": result.n_color_blocks,
@@ -164,6 +188,105 @@ def download(job_id: str, filetype: str):
                              download_name="onizleme.png")
 
     return jsonify({"error": "Dosya bulunamadi."}), 404
+
+
+@app.route("/api/animation/<job_id>")
+def animation_gif(job_id: str):
+    """Generate and serve an animated GIF of the stitch process."""
+    import json as _json
+    job_dir = JOBS_DIR / job_id
+    if not job_dir.exists():
+        return jsonify({"error": "Is bulunamadi."}), 404
+
+    seq_path = job_dir / "stitch_seq.json"
+    if not seq_path.exists():
+        return jsonify({"error": "Stitch verisi bulunamadi."}), 404
+
+    gif_path = job_dir / "surec.gif"
+    if not gif_path.exists():
+        seq = _json.loads(seq_path.read_text(encoding="utf-8"))
+        _build_gif(seq, gif_path)
+
+    return send_file(str(gif_path), as_attachment=True, download_name="surec.gif")
+
+
+def _build_gif(
+    stitch_seq: list,
+    out_path: Path,
+    scale: float = 3.0,
+    n_frames: int = 180,
+    fps: int = 30,
+) -> None:
+    """Render animated GIF from stitch_seq (Y-down mm, same as preview renderer).
+
+    stitch_seq format: [[x_mm, y_mm, cmd(0=stitch,1=jump), blk, r, g, b], ...]
+    No Y-flip — Y-down mm maps directly to PIL Y-down pixels.
+    """
+    from PIL import Image as _Img, ImageDraw as _Draw
+
+    stitch_pts = [[s[0], s[1], s[4], s[5], s[6]] for s in stitch_seq if s[2] == 0]
+    if not stitch_pts:
+        _Img.new("RGB", (100, 100), "white").save(str(out_path))
+        return
+
+    xs = [p[0] for p in stitch_pts]
+    ys = [p[1] for p in stitch_pts]
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+    pad = 20
+
+    img_w = max(1, int((max_x - min_x) * scale)) + 2 * pad
+    img_h = max(1, int((max_y - min_y) * scale)) + 2 * pad
+
+    def to_px(x_mm: float, y_mm: float) -> tuple[int, int]:
+        # Y-down mm → Y-down px (no flip, same convention as preview)
+        return (int((x_mm - min_x) * scale) + pad,
+                int((y_mm - min_y) * scale) + pad)
+
+    step = max(1, len(stitch_pts) // n_frames)
+    canvas = _Img.new("RGB", (img_w, img_h), "white")
+    frames: list[_Img.Image] = []
+    last_px = None
+    last_jump = True   # reset pen on block boundary
+    stitch_i = 0
+    seq_i = 0
+
+    for frame_n in range(n_frames):
+        target = (frame_n + 1) * step
+        draw = _Draw.Draw(canvas)
+
+        while stitch_i < target and seq_i < len(stitch_seq):
+            row = stitch_seq[seq_i]
+            seq_i += 1
+            x, y, cmd, _, r, g, b = row
+            if cmd == 1:   # jump / block start → lift pen
+                last_px = None
+            else:           # stitch
+                px, py = to_px(x, y)
+                if last_px is not None:
+                    draw.line([last_px, (px, py)], fill=(r, g, b), width=2)
+                last_px = (px, py)
+                stitch_i += 1
+
+        frame = canvas.copy()
+        if last_px:
+            fd = _Draw.Draw(frame)
+            nx, ny = last_px
+            fd.ellipse([nx - 4, ny - 4, nx + 4, ny + 4], fill=(220, 40, 40))
+
+        frames.append(frame.convert("P", palette=_Img.ADAPTIVE, colors=64))
+
+    if not frames:
+        return
+
+    frames[0].save(
+        str(out_path),
+        save_all=True,
+        append_images=frames[1:],
+        duration=int(1000 / fps),
+        loop=0,
+        optimize=True,
+    )
 
 
 if __name__ == "__main__":
