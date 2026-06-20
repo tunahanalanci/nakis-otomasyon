@@ -194,6 +194,37 @@ input:checked + .slider:before { transform: translateX(16px); }
 }
 .empty-state .big { font-size: 3rem; }
 
+/* Tabs */
+.tabs { display: flex; gap: 0; margin-bottom: 0; border-bottom: 1px solid var(--border); }
+.tab-btn {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--muted); padding: 10px 18px; font-size: 0.88rem; cursor: pointer;
+  transition: color .2s, border-color .2s;
+}
+.tab-btn.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* Canvas animation */
+#anim-canvas {
+  width: 100%; border-radius: 6px; background: #fff;
+  display: block; max-height: 340px;
+}
+.anim-controls {
+  display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap;
+}
+.ctrl-btn {
+  background: #1a1a38; border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer;
+  transition: border-color .2s;
+}
+.ctrl-btn:hover { border-color: var(--accent); }
+.anim-progress { font-size: 0.8rem; color: var(--muted); margin-left: auto; }
+.speed-sel {
+  background: #1a1a38; border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 5px 8px; font-size: 0.82rem;
+}
+
 /* Result cards */
 .result-grid {
   display: grid;
@@ -397,32 +428,66 @@ input:checked + .slider:before { transform: translateX(16px); }
 
     <div class="error-banner" id="error-banner"></div>
 
-    <div id="results" style="display:none;display:flex;flex-direction:column;gap:16px;">
+    <div id="results" style="display:none;flex-direction:column;gap:16px;">
 
-      <div class="preview-card">
-        <h3>Dikis Yolu Onizleme</h3>
-        <img id="preview-img" src="" alt="onizleme">
-        <div class="scale-bar">
-          <span id="scale-left">0 mm</span>
-          <span id="scale-right" style="text-align:right;"></span>
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('tab-preview',this)">Onizleme</button>
+        <button class="tab-btn"        onclick="switchTab('tab-anim',this)">&#9654; Animasyon</button>
+        <button class="tab-btn"        onclick="switchTab('tab-stats',this)">Istatistik</button>
+      </div>
+
+      <!-- TAB: Static preview -->
+      <div id="tab-preview" class="tab-pane active">
+        <div class="preview-card" style="margin-top:0;">
+          <h3>Dikis Yolu Onizleme</h3>
+          <img id="preview-img" src="" alt="onizleme">
+          <div class="scale-bar">
+            <span id="scale-left">0 mm</span>
+            <span id="scale-right" style="text-align:right;"></span>
+          </div>
         </div>
       </div>
 
-      <div class="result-grid">
-
-        <div class="card">
-          <h3>Istatistik</h3>
-          <div class="stat"><div class="val" id="st-stitches">—</div><div class="lbl">Dikis sayisi</div></div>
-          <div class="stat"><div class="val" id="st-colors">—</div><div class="lbl">Renk blok</div></div>
-          <div class="stat"><div class="val" id="st-size">—</div><div class="lbl">Gercek boyut (mm)</div></div>
+      <!-- TAB: Canvas animation -->
+      <div id="tab-anim" class="tab-pane">
+        <div class="preview-card" style="margin-top:0;">
+          <h3>Nakis Sureci Animasyonu</h3>
+          <canvas id="anim-canvas" width="600" height="400"></canvas>
+          <div class="anim-controls">
+            <button class="ctrl-btn" id="btn-play"    onclick="animPlay()">&#9654; Oynat</button>
+            <button class="ctrl-btn"                   onclick="animRestart()">&#8635; Basdan</button>
+            <label style="font-size:0.82rem;color:var(--muted);">Hiz:
+              <select class="speed-sel" id="speed-sel">
+                <option value="0.5">0.5×</option>
+                <option value="1" selected>1×</option>
+                <option value="2">2×</option>
+                <option value="4">4×</option>
+              </select>
+            </label>
+            <span class="anim-progress" id="anim-progress">0 / 0 dikis</span>
+          </div>
+          <div style="margin-top:10px;">
+            <a class="btn-dl" id="dl-gif" href="#" onclick="downloadGif(event)">&#127803; Animasyonu GIF Indir</a>
+          </div>
         </div>
+      </div>
 
-        <div class="card">
-          <h3>Dogrulama</h3>
-          <div style="margin-bottom:10px;" id="val-badge"></div>
-          <ul class="msg-list" id="msg-list"></ul>
+      <!-- TAB: Stats -->
+      <div id="tab-stats" class="tab-pane">
+        <div class="result-grid">
+          <div class="card">
+            <h3>Istatistik</h3>
+            <div class="stat"><div class="val" id="st-stitches">—</div><div class="lbl">Dikis sayisi</div></div>
+            <div class="stat"><div class="val" id="st-colors">—</div><div class="lbl">Renk blok</div></div>
+            <div class="stat"><div class="val" id="st-size">—</div><div class="lbl">Gercek boyut (mm)</div></div>
+          </div>
+          <div class="card">
+            <h3>Dogrulama</h3>
+            <div style="margin-bottom:10px;" id="val-badge"></div>
+            <ul class="msg-list" id="msg-list"></ul>
+          </div>
         </div>
-
       </div>
 
       <div class="card">
@@ -440,7 +505,173 @@ input:checked + .slider:before { transform: translateX(16px); }
 </div>
 
 <script>
-let currentJobId = null;
+let currentJobId  = null;
+let stitchSeq     = [];   // [{x,y,cmd,blk,r,g,b}, ...]
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tabId, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  btn.classList.add('active');
+  if (tabId === 'tab-anim' && stitchSeq.length && animFrame === 0 && !animRunning) {
+    animDraw(0);
+  }
+}
+
+// ── Canvas animation engine ───────────────────────────────────────────────────
+const STITCH_CMD = 0, JUMP_CMD = 1, TRIM_CMD = 2;
+
+let animRunning  = false;
+let animFrame    = 0;
+let animIdx      = 0;   // index into stitchSeq
+let animLastPx   = null;
+let animRAF      = null;
+let animCanvas   = null;
+let animCtx      = null;
+let animScale    = 3.0;  // px per mm
+let animMinX     = 0;
+let animMinY     = 0;
+let animMaxY     = 0;
+let animPad      = 16;
+
+function animInit(seq) {
+  stitchSeq = seq;
+  animCanvas = document.getElementById('anim-canvas');
+  animCtx    = animCanvas.getContext('2d');
+
+  const pts = seq.filter(s => s.cmd === STITCH_CMD);
+  if (!pts.length) return;
+
+  const xs   = pts.map(s => s[0]);
+  const ys   = pts.map(s => s[1]);
+  animMinX   = Math.min(...xs);
+  animMinY   = Math.min(...ys);
+  animMaxY   = Math.max(...ys);
+  const maxX = Math.max(...xs);
+
+  const designW = (maxX   - animMinX) * animScale + animPad * 2;
+  const designH = (animMaxY - animMinY) * animScale + animPad * 2;
+
+  animCanvas.width  = Math.max(10, designW);
+  animCanvas.height = Math.max(10, designH);
+
+  animCtx.fillStyle = '#ffffff';
+  animCtx.fillRect(0, 0, animCanvas.width, animCanvas.height);
+  animFrame  = 0;
+  animIdx    = 0;
+  animLastPx = null;
+  document.getElementById('anim-progress').textContent = '0 / ' + pts.length + ' dikis';
+  document.getElementById('btn-play').textContent = '▶ Oynat';
+  animRunning = false;
+}
+
+function toPx(xMm, yMm) {
+  return [
+    (xMm - animMinX) * animScale + animPad,
+    (animMaxY - yMm) * animScale + animPad    // Y flip: DST Y-up → canvas Y-down
+  ];
+}
+
+function animDraw(targetIdx) {
+  if (!animCtx || !stitchSeq.length) return;
+  const totalStitches = stitchSeq.filter(s => s.cmd === STITCH_CMD).length;
+  let stitchCount = 0;
+
+  while (animIdx < targetIdx && animIdx < stitchSeq.length) {
+    const s = stitchSeq[animIdx++];
+
+    if (s.cmd === TRIM_CMD || s.cmd === JUMP_CMD) {
+      animLastPx = null;
+    } else if (s.cmd === STITCH_CMD) {
+      const [px, py] = toPx(s.x, s.y);
+      if (animLastPx) {
+        animCtx.beginPath();
+        animCtx.strokeStyle = `rgb(${s.r},${s.g},${s.b})`;
+        animCtx.lineWidth = 1.5;
+        animCtx.moveTo(animLastPx[0], animLastPx[1]);
+        animCtx.lineTo(px, py);
+        animCtx.stroke();
+      }
+      animLastPx = [px, py];
+      stitchCount++;
+    }
+  }
+
+  // Count stitches drawn so far
+  const drawn = stitchSeq.slice(0, animIdx).filter(s => s.cmd === STITCH_CMD).length;
+  document.getElementById('anim-progress').textContent = drawn + ' / ' + totalStitches + ' dikis';
+
+  // Draw needle dot at current position
+  if (animLastPx) {
+    // Erase previous dot area by redrawing segment (lightweight approach: just draw dot)
+    animCtx.beginPath();
+    animCtx.fillStyle = '#dc2626';
+    animCtx.arc(animLastPx[0], animLastPx[1], 4, 0, Math.PI * 2);
+    animCtx.fill();
+  }
+}
+
+let _lastTimestamp = null;
+const STITCHES_PER_SEC_BASE = 120;  // at 1× speed
+
+function animStep(ts) {
+  if (!animRunning) return;
+  if (_lastTimestamp === null) _lastTimestamp = ts;
+  const elapsed = ts - _lastTimestamp;
+  _lastTimestamp = ts;
+
+  const speed = parseFloat(document.getElementById('speed-sel').value) || 1;
+  const perFrame = Math.max(1, Math.round((STITCHES_PER_SEC_BASE * speed * elapsed) / 1000));
+
+  animDraw(animIdx + perFrame);
+
+  if (animIdx >= stitchSeq.length) {
+    animRunning = false;
+    _lastTimestamp = null;
+    document.getElementById('btn-play').textContent = '▶ Oynat';
+    return;
+  }
+
+  animRAF = requestAnimationFrame(animStep);
+}
+
+function animPlay() {
+  if (!stitchSeq.length) return;
+  if (animRunning) {
+    // Pause
+    animRunning = false;
+    _lastTimestamp = null;
+    if (animRAF) cancelAnimationFrame(animRAF);
+    document.getElementById('btn-play').textContent = '▶ Oynat';
+  } else {
+    if (animIdx >= stitchSeq.length) animRestart();
+    animRunning = true;
+    _lastTimestamp = null;
+    document.getElementById('btn-play').textContent = '⏸ Duraklat';
+    animRAF = requestAnimationFrame(animStep);
+  }
+}
+
+function animRestart() {
+  animRunning = false;
+  _lastTimestamp = null;
+  if (animRAF) cancelAnimationFrame(animRAF);
+  animIdx    = 0;
+  animLastPx = null;
+  if (animCtx) {
+    animCtx.fillStyle = '#ffffff';
+    animCtx.fillRect(0, 0, animCanvas.width, animCanvas.height);
+  }
+  const totalStitches = stitchSeq.filter(s => s.cmd === STITCH_CMD).length;
+  document.getElementById('anim-progress').textContent = '0 / ' + totalStitches + ' dikis';
+  document.getElementById('btn-play').textContent = '▶ Oynat';
+}
+
+function downloadGif(e) {
+  if (!currentJobId) { e.preventDefault(); return; }
+  document.getElementById('dl-gif').href = '/api/animation/' + currentJobId;
+}
 
 // ── Drag & drop ──────────────────────────────────────────────────────────────
 const dropzone  = document.getElementById('dropzone');
@@ -551,6 +782,13 @@ function showResults(data) {
   document.getElementById('preview-img').src = 'data:image/png;base64,' + data.preview_b64;
   document.getElementById('scale-left').textContent  = '0 mm';
   document.getElementById('scale-right').textContent = s.actual_w_mm + ' × ' + s.actual_h_mm + ' mm  (hedef: ' + s.target_w_mm + ' × ' + s.target_h_mm + ' mm)';
+
+  // Init canvas animation with stitch sequence from API
+  if (data.stitch_seq && data.stitch_seq.length) {
+    animInit(data.stitch_seq.map(row => ({
+      x: row[0], y: row[1], cmd: row[2], blk: row[3], r: row[4], g: row[5], b: row[6]
+    })));
+  }
 
   // Stats
   document.getElementById('st-stitches').textContent = s.total_stitches.toLocaleString('tr-TR');
