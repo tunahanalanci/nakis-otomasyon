@@ -2,14 +2,18 @@
 
 PNG görüntüsünden Tajima endüstriyel nakış makinelerinin okuduğu **DST** dosyası üreten Python otomasyon sistemi.
 
-## Özellikler
+## Ozellikler
 
-- PNG + boyut (mm) → DST dosyası
-- k-means renk azaltma (ayarlanabilir renk sayısı)
-- Otomatik fill / satin / running stitch seçimi
-- DST renk taşımadığı için operatör rehberi: **renk sırası raporu** (TXT + swatch PNG)
-- Stitch yoğunluğu ve kasnak sınır doğrulaması
-- Opsiyonel USB'ye doğrudan kopyalama
+- **Web arayuzu** — tarayicidan gorsel yukle, DST indir (`python app.py`)
+- PNG / JPG + boyut (mm) → Tajima DST dosyasi
+- Tatami dolgu + underlay + satin stitch motoru
+- k-means renk azaltma; tek renk logolar dahil tum durumlar
+- Beyaz/seffaf arka plan otomatik tespiti; delikler (harf gozleri, yildizlar) dikilmez
+- Operatör renk sirasi raporu (TXT)
+- Stitch yogunlugu, kasnak siniri, kisa/uzun dikis dogrulamasi
+- USB'ye dogrudan kopyalama
+
+> **Tavsiye:** Sade, az renkli logolar en iyi sonucu verir. Fotograf veya degradeli gorseller nakis icin uygun degildir.
 
 ## Kurulum
 
@@ -23,7 +27,21 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Kullanım
+## Web Arayuzu (Onerilen)
+
+```bash
+python app.py
+```
+
+Tarayici otomatik acar: `http://localhost:5000`
+
+- Gorsel surukle-birak yukle
+- Genislik / yukseklik (mm) gir
+- Kasnak boyutu sec, renk ve gelismis ayarlar
+- **DST Uret** butonuna tikla
+- Onizlemeyi gor, DST + renk raporu indir
+
+## Komut Satiri
 
 ```bash
 python cli.py logo.png --width 80 --height 60 --colors 4 --out out/
@@ -63,6 +81,67 @@ options:
 | `out/<isim>.dst` | Tajima DST dosyası |
 | `out/<isim>_preview.png` | Dikiş yolu önizlemesi |
 | `out/renk_sirasi.txt` | Renk sırası raporu (operatör kılavuzu) |
+
+## Ink/Stitch Motoru (feat/inkstitch-engine)
+
+Mevcut el yazımı stitch motoruna alternatif olarak **Inkscape + Ink/Stitch** tabanlı motor.
+
+### Kurulum
+
+1. **Inkscape 1.4+** kur (Windows MSI: https://inkscape.org/release/ )
+2. **Ink/Stitch** eklentisini kullanıcı extensions klasörüne kur:
+   ```powershell
+   # Ink/Stitch v3.2.2 zip'i indir
+   Invoke-WebRequest -Uri "https://github.com/inkstitch/inkstitch/releases/download/v3.2.2/inkstitch-v3.2.2-windows-64bit.zip" `
+     -OutFile "$env:TEMP\inkstitch.zip"
+   # Kullanici extensions klasorune cikart
+   Expand-Archive "$env:TEMP\inkstitch.zip" "$env:APPDATA\inkscape\extensions" -Force
+   ```
+
+### Headless DST export (komut satırı)
+
+```powershell
+inkscape --batch-process `
+  "--actions=select-all;org.inkstitch.output.dst;export-filename:out.dst;export-do" `
+  input.svg
+```
+
+### POC testi
+
+```bash
+python scripts/inkstitch_poc.py
+# Cikti: out/poc.dst, out/poc_preview.png
+```
+
+### Logo isleme
+
+```bash
+python scripts/inkstitch_logo.py
+# Cikti: out/logo_inkstitch.dst, out/logo_inkstitch_preview.png
+```
+
+### Motor ciktisini goster
+
+```bash
+python scripts/show_engine_output.py
+# Cikti: out/logo_inkstitch_preview.png (bilgi seridi), out/compare_logo.png,
+#        out/logo_process.gif, out/logo_test_80mm.dst, out/renk_sirasi.txt
+```
+
+### Makinede test (Tajima)
+
+1. `out/logo_test_80mm.dst` dosyasini FAT32 USB belleğe kopyala
+2. Tajima'da aç ve renk sirasini `out/renk_sirasi.txt`'ye gore iplik ata:
+   - 1. ilik → **Lacivert** (#2b3b4a)
+   - 2. ilik → **Altın** (#aa8a50)
+3. Dik; aşağıdakileri not et:
+
+| Kontrol | Sonuç |
+|---|---|
+| USB'de dosya klasörü/adı | |
+| Gerçek boyut (cetvelle ölç mm) | |
+| Dolgu kalitesi | |
+| Renk durması çalışıyor mu? | |
 
 ## Testler
 

@@ -160,30 +160,32 @@ class TestValidate:
 # ── render_preview ────────────────────────────────────────────────────────────
 
 class TestRenderPreview:
+    """render_preview now takes StitchBlocks (Y-down mm) + palette, not DST path."""
+
+    def _make_blocks(self, pts_mm):
+        from src.optimize import StitchBlock
+        return [StitchBlock(color_idx=0, points=pts_mm)]
+
     def test_creates_png_file(self, tmp_path):
-        dst = _write_simple_dst(tmp_path, [(0, 0), (300, 0), (300, 300), (0, 300)])
+        blocks = self._make_blocks([(0.0, 0.0), (30.0, 0.0), (30.0, 30.0), (0.0, 30.0)])
         out = tmp_path / "preview.png"
-        result = render_preview(dst, out)
+        result = render_preview(blocks, [(0, 0, 200)], out)
         assert result == out
         assert out.exists()
         assert out.stat().st_size > 0
 
     def test_output_is_valid_image(self, tmp_path):
-        dst = _write_simple_dst(tmp_path, [(0, 0), (400, 0), (400, 400), (0, 400)])
+        blocks = self._make_blocks([(0.0, 0.0), (40.0, 0.0), (40.0, 40.0), (0.0, 40.0)])
         out = tmp_path / "preview.png"
-        render_preview(dst, out)
+        render_preview(blocks, [(200, 0, 0)], out)
         img = Image.open(str(out))
         assert img.mode == "RGB"
         assert img.size[0] > 1 and img.size[1] > 1
 
     def test_empty_pattern_produces_fallback_image(self, tmp_path):
-        # A pattern with only END and no stitches → 100×100 white image
-        p = pyembroidery.EmbPattern()
-        p.add_stitch_absolute(pyembroidery.END, 0, 0)
-        dst = tmp_path / "empty.dst"
-        pyembroidery.write(p, str(dst))
+        # Empty blocks → 100×100 white fallback image
         out = tmp_path / "preview.png"
-        render_preview(dst, out)
+        render_preview([], [(0, 0, 200)], out)
         assert out.exists()
         img = Image.open(str(out))
         assert img.size == (100, 100)

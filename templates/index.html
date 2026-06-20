@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nakis Otomasyon</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0d0d14;
+  --surface:  #16162a;
+  --border:   #2a2a4a;
+  --accent:   #5b8af0;
+  --accent2:  #7ecfff;
+  --text:     #dde4f0;
+  --muted:    #7788aa;
+  --ok:       #4dbb88;
+  --warn:     #f0a040;
+  --err:      #e05555;
+  --radius:   10px;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  background: linear-gradient(135deg, #0f1728 0%, #162044 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 18px 32px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header h1 { font-size: 1.3rem; color: #fff; font-weight: 700; }
+header span { font-size: 0.85rem; color: var(--muted); }
+
+.layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+}
+@media(max-width:900px){ .layout { grid-template-columns: 1fr; } }
+
+/* ── LEFT PANEL ── */
+.left {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+/* Drop zone */
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 32px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  position: relative;
+}
+.dropzone:hover, .dropzone.over {
+  border-color: var(--accent);
+  background: #1a1a38;
+}
+.dropzone input[type=file] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.dropzone .icon { font-size: 2.2rem; margin-bottom: 8px; }
+.dropzone p { font-size: 0.88rem; color: var(--muted); }
+.dropzone p strong { color: var(--text); }
+
+#thumb-wrap { display: none; margin-top: 10px; }
+#thumb-wrap img {
+  width: 100%; border-radius: 6px;
+  border: 1px solid var(--border);
+  max-height: 160px; object-fit: contain; background: #fff;
+}
+
+/* Inputs */
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 0.8rem; color: var(--muted); }
+.field input, .field select {
+  background: #0f0f1e;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  width: 100%;
+  transition: border-color .2s;
+}
+.field input:focus, .field select:focus {
+  outline: none; border-color: var(--accent);
+}
+
+/* Advanced toggle */
+.adv-toggle {
+  background: none; border: 1px solid var(--border);
+  color: var(--muted); border-radius: 6px;
+  padding: 7px 12px; font-size: 0.82rem; cursor: pointer;
+  width: 100%; text-align: left; transition: border-color .2s;
+}
+.adv-toggle:hover { border-color: var(--accent); color: var(--text); }
+#adv-panel { display: none; }
+#adv-panel.open { display: flex; flex-direction: column; gap: 14px; }
+
+/* Toggle switch */
+.toggle-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.85rem;
+}
+.toggle-row label { color: var(--muted); }
+.switch { position: relative; display: inline-block; width: 38px; height: 22px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute; inset: 0; background: #333; border-radius: 22px;
+  cursor: pointer; transition: .2s;
+}
+.slider:before {
+  content: ""; position: absolute;
+  height: 16px; width: 16px; left: 3px; bottom: 3px;
+  background: white; border-radius: 50%; transition: .2s;
+}
+input:checked + .slider { background: var(--accent); }
+input:checked + .slider:before { transform: translateX(16px); }
+
+/* Generate button */
+.btn-generate {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 13px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .2s, transform .1s;
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-generate:hover:not(:disabled) { background: #4a76d8; }
+.btn-generate:disabled { opacity: .5; cursor: not-allowed; }
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  display: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── RIGHT PANEL ── */
+.right {
+  padding: 28px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  gap: 12px;
+  text-align: center;
+}
+.empty-state .big { font-size: 3rem; }
+
+/* Tabs */
+.tabs { display: flex; gap: 0; margin-bottom: 0; border-bottom: 1px solid var(--border); }
+.tab-btn {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--muted); padding: 10px 18px; font-size: 0.88rem; cursor: pointer;
+  transition: color .2s, border-color .2s;
+}
+.tab-btn.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* Canvas animation */
+#anim-canvas {
+  width: 100%; border-radius: 6px; background: #fff;
+  display: block; max-height: 340px;
+}
+.anim-controls {
+  display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap;
+}
+.ctrl-btn {
+  background: #1a1a38; border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer;
+  transition: border-color .2s;
+}
+.ctrl-btn:hover { border-color: var(--accent); }
+.anim-progress { font-size: 0.8rem; color: var(--muted); margin-left: auto; }
+.speed-sel {
+  background: #1a1a38; border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 5px 8px; font-size: 0.82rem;
+}
+
+/* Result cards */
+.result-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media(max-width:600px){ .result-grid { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.card h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 14px; }
+
+.preview-card {
+  grid-column: 1 / -1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.preview-card img {
+  width: 100%; border-radius: 6px;
+  background: #fff; max-height: 320px; object-fit: contain;
+}
+.scale-bar {
+  display: flex; justify-content: space-between;
+  font-size: 0.72rem; color: var(--muted); margin-top: 6px;
+}
+
+.stat { margin-bottom: 12px; }
+.stat .val { font-size: 1.6rem; font-weight: 700; color: var(--accent2); line-height: 1; }
+.stat .lbl { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600;
+}
+.badge.ok   { background: #0d2a1a; border: 1px solid #1a6040; color: var(--ok); }
+.badge.warn { background: #2a1e0a; border: 1px solid #6a4010; color: var(--warn); }
+.badge.err  { background: #2a0d0d; border: 1px solid #6a1515; color: var(--err); }
+
+.msg-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.msg-list li {
+  font-size: 0.82rem; padding: 7px 10px; border-radius: 6px;
+}
+.msg-list li.err  { background: #2a0d0d; color: var(--err); border-left: 3px solid var(--err); }
+.msg-list li.warn { background: #2a1e0a; color: var(--warn); border-left: 3px solid var(--warn); }
+
+.dl-row {
+  display: flex; gap: 10px; flex-wrap: wrap;
+}
+.btn-dl {
+  background: #1a1a38;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 9px 16px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color .2s, background .2s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-dl:hover { border-color: var(--accent); background: #1e1e46; }
+
+/* Error banner */
+.error-banner {
+  background: #2a0d0d;
+  border: 1px solid var(--err);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  color: var(--err);
+  font-size: 0.9rem;
+  display: none;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>&#129526; Nakis Otomasyon</h1>
+    <span>PNG / JPG &rarr; Tajima DST nakis dosyasi</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT: Controls -->
+  <div class="left">
+
+    <!-- File upload -->
+    <div>
+      <div class="section-label">Gorsel</div>
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="file-input" accept=".png,.jpg,.jpeg">
+        <div class="icon">&#128247;</div>
+        <p><strong>Surukle &amp; birak</strong> veya tikla</p>
+        <p style="margin-top:4px;font-size:0.78rem;">PNG, JPG &bull; Sade logo onerilen</p>
+      </div>
+      <div id="thumb-wrap"><img id="thumb" src="" alt="onizleme"></div>
+    </div>
+
+    <!-- Dimensions -->
+    <div>
+      <div class="section-label">Boyutlar</div>
+      <div class="row">
+        <div class="field">
+          <label>Genislik (mm)</label>
+          <input type="number" id="width_mm" value="80" min="10" max="500" step="1">
+        </div>
+        <div class="field">
+          <label>Yukseklik (mm)</label>
+          <input type="number" id="height_mm" value="60" min="10" max="500" step="1">
+        </div>
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label>Kasnak boyutu</label>
+        <select id="hoop">
+          <option value="100x100">100 &times; 100 mm</option>
+          <option value="130x110">130 &times; 110 mm</option>
+          <option value="150x200">150 &times; 200 mm</option>
+          <option value="200x200" selected>200 &times; 200 mm</option>
+          <option value="300x200">300 &times; 200 mm</option>
+          <option value="360x200">360 &times; 200 mm</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Colors -->
+    <div>
+      <div class="section-label">Renkler</div>
+      <div class="field">
+        <label>Maksimum renk sayisi</label>
+        <select id="max_colors">
+          <option value="1">1 &mdash; Tek renk (siyah/beyaz logo)</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="6">6</option>
+          <option value="8">8</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Advanced -->
+    <div>
+      <div class="section-label">Gelismis Ayarlar</div>
+      <button class="adv-toggle" onclick="toggleAdv()">&#9881; Ayarlari goster &darr;</button>
+      <div id="adv-panel">
+        <div class="row">
+          <div class="field">
+            <label>Dolgu siklik (mm)</label>
+            <input type="number" id="spacing_mm" value="0.4" min="0.2" max="2" step="0.1">
+          </div>
+          <div class="field">
+            <label>Dolgu acisi (&deg;)</label>
+            <input type="number" id="angle_deg" value="45" min="0" max="180" step="15">
+          </div>
+        </div>
+        <div class="field">
+          <label>Cekme telafisi (mm)</label>
+          <input type="number" id="pull_compensation_mm" value="0.2" min="0" max="1" step="0.05">
+        </div>
+        <div class="toggle-row">
+          <label>Underlay (alt destek dikisi)</label>
+          <label class="switch">
+            <input type="checkbox" id="underlay" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <label>Jump dikileri trim et</label>
+          <label class="switch">
+            <input type="checkbox" id="trim_jumps" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generate -->
+    <button class="btn-generate" id="btn-gen" onclick="generate()">
+      <div class="spinner" id="spinner"></div>
+      <span id="btn-text">&#9654; DST Uret</span>
+    </button>
+
+  </div>
+
+  <!-- RIGHT: Results -->
+  <div class="right" id="right-panel">
+
+    <div class="empty-state" id="empty-state">
+      <div class="big">&#129526;</div>
+      <p>Gorsel yukle ve DST Uret butonuna tikla.</p>
+      <p style="font-size:0.8rem;">Sade, az renkli logolar en iyi sonucu verir.</p>
+    </div>
+
+    <div class="error-banner" id="error-banner"></div>
+
+    <div id="results" style="display:none;flex-direction:column;gap:16px;">
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('tab-preview',this)">Onizleme</button>
+        <button class="tab-btn"        onclick="switchTab('tab-anim',this)">&#9654; Animasyon</button>
+        <button class="tab-btn"        onclick="switchTab('tab-stats',this)">Istatistik</button>
+      </div>
+
+      <!-- TAB: Static preview -->
+      <div id="tab-preview" class="tab-pane active">
+        <div class="preview-card" style="margin-top:0;">
+          <h3>Dikis Yolu Onizleme</h3>
+          <img id="preview-img" src="" alt="onizleme">
+          <div class="scale-bar">
+            <span id="scale-left">0 mm</span>
+            <span id="scale-right" style="text-align:right;"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Canvas animation -->
+      <div id="tab-anim" class="tab-pane">
+        <div class="preview-card" style="margin-top:0;">
+          <h3>Nakis Sureci Animasyonu</h3>
+          <canvas id="anim-canvas" width="600" height="400"></canvas>
+          <div class="anim-controls">
+            <button class="ctrl-btn" id="btn-play"    onclick="animPlay()">&#9654; Oynat</button>
+            <button class="ctrl-btn"                   onclick="animRestart()">&#8635; Basdan</button>
+            <label style="font-size:0.82rem;color:var(--muted);">Hiz:
+              <select class="speed-sel" id="speed-sel">
+                <option value="0.5">0.5×</option>
+                <option value="1" selected>1×</option>
+                <option value="2">2×</option>
+                <option value="4">4×</option>
+              </select>
+            </label>
+            <span class="anim-progress" id="anim-progress">0 / 0 dikis</span>
+          </div>
+          <div style="margin-top:10px;">
+            <a class="btn-dl" id="dl-gif" href="#" onclick="downloadGif(event)">&#127803; Animasyonu GIF Indir</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Stats -->
+      <div id="tab-stats" class="tab-pane">
+        <div class="result-grid">
+          <div class="card">
+            <h3>Istatistik</h3>
+            <div class="stat"><div class="val" id="st-stitches">—</div><div class="lbl">Dikis sayisi</div></div>
+            <div class="stat"><div class="val" id="st-colors">—</div><div class="lbl">Renk blok</div></div>
+            <div class="stat"><div class="val" id="st-size">—</div><div class="lbl">Gercek boyut (mm)</div></div>
+          </div>
+          <div class="card">
+            <h3>Dogrulama</h3>
+            <div style="margin-bottom:10px;" id="val-badge"></div>
+            <ul class="msg-list" id="msg-list"></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Indir</h3>
+        <div class="dl-row">
+          <a class="btn-dl" id="dl-dst"     href="#">&#128190; DST Dosyasi</a>
+          <a class="btn-dl" id="dl-report"  href="#">&#128196; Renk Sirasi</a>
+          <a class="btn-dl" id="dl-preview" href="#">&#128247; Onizleme PNG</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+let currentJobId  = null;
+let stitchSeq     = [];   // [{x,y,cmd,blk,r,g,b}, ...]
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tabId, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  btn.classList.add('active');
+  if (tabId === 'tab-anim' && stitchSeq.length && animFrame === 0 && !animRunning) {
+    animDraw(0);
+  }
+}
+
+// ── Canvas animation engine ───────────────────────────────────────────────────
+const STITCH_CMD = 0, JUMP_CMD = 1, TRIM_CMD = 2;
+
+let animRunning  = false;
+let animFrame    = 0;
+let animIdx      = 0;   // index into stitchSeq
+let animLastPx   = null;
+let animRAF      = null;
+let animCanvas   = null;
+let animCtx      = null;
+let animScale    = 3.0;  // px per mm
+let animMinX     = 0;
+let animMinY     = 0;
+let animPad      = 16;
+
+function animInit(seq) {
+  stitchSeq = seq;
+  animCanvas = document.getElementById('anim-canvas');
+  animCtx    = animCanvas.getContext('2d');
+
+  const pts = seq.filter(s => s.cmd === STITCH_CMD);
+  if (!pts.length) return;
+
+  const xs   = pts.map(s => s.x);
+  const ys   = pts.map(s => s.y);
+  animMinX   = Math.min(...xs);
+  animMinY   = Math.min(...ys);
+  const maxX = Math.max(...xs);
+  const maxY = Math.max(...ys);
+
+  const designW = (maxX - animMinX) * animScale + animPad * 2;
+  const designH = (maxY - animMinY) * animScale + animPad * 2;
+
+  animCanvas.width  = Math.max(10, designW);
+  animCanvas.height = Math.max(10, designH);
+
+  animCtx.fillStyle = '#ffffff';
+  animCtx.fillRect(0, 0, animCanvas.width, animCanvas.height);
+  animFrame  = 0;
+  animIdx    = 0;
+  animLastPx = null;
+  document.getElementById('anim-progress').textContent = '0 / ' + pts.length + ' dikis';
+  document.getElementById('btn-play').textContent = '▶ Oynat';
+  animRunning = false;
+}
+
+function toPx(xMm, yMm) {
+  return [
+    (xMm - animMinX) * animScale + animPad,
+    (yMm - animMinY) * animScale + animPad    // Y-down mm → Y-down canvas (no flip)
+  ];
+}
+
+function animDraw(targetIdx) {
+  if (!animCtx || !stitchSeq.length) return;
+  const totalStitches = stitchSeq.filter(s => s.cmd === STITCH_CMD).length;
+  let stitchCount = 0;
+
+  while (animIdx < targetIdx && animIdx < stitchSeq.length) {
+    const s = stitchSeq[animIdx++];
+
+    if (s.cmd === TRIM_CMD || s.cmd === JUMP_CMD) {
+      animLastPx = null;
+    } else if (s.cmd === STITCH_CMD) {
+      const [px, py] = toPx(s.x, s.y);
+      if (animLastPx) {
+        animCtx.beginPath();
+        animCtx.strokeStyle = `rgb(${s.r},${s.g},${s.b})`;
+        animCtx.lineWidth = 1.5;
+        animCtx.moveTo(animLastPx[0], animLastPx[1]);
+        animCtx.lineTo(px, py);
+        animCtx.stroke();
+      }
+      animLastPx = [px, py];
+      stitchCount++;
+    }
+  }
+
+  // Count stitches drawn so far
+  const drawn = stitchSeq.slice(0, animIdx).filter(s => s.cmd === STITCH_CMD).length;
+  document.getElementById('anim-progress').textContent = drawn + ' / ' + totalStitches + ' dikis';
+
+  // Draw needle dot at current position
+  if (animLastPx) {
+    // Erase previous dot area by redrawing segment (lightweight approach: just draw dot)
+    animCtx.beginPath();
+    animCtx.fillStyle = '#dc2626';
+    animCtx.arc(animLastPx[0], animLastPx[1], 4, 0, Math.PI * 2);
+    animCtx.fill();
+  }
+}
+
+let _lastTimestamp = null;
+const STITCHES_PER_SEC_BASE = 120;  // at 1× speed
+
+function animStep(ts) {
+  if (!animRunning) return;
+  if (_lastTimestamp === null) _lastTimestamp = ts;
+  const elapsed = ts - _lastTimestamp;
+  _lastTimestamp = ts;
+
+  const speed = parseFloat(document.getElementById('speed-sel').value) || 1;
+  const perFrame = Math.max(1, Math.round((STITCHES_PER_SEC_BASE * speed * elapsed) / 1000));
+
+  animDraw(animIdx + perFrame);
+
+  if (animIdx >= stitchSeq.length) {
+    animRunning = false;
+    _lastTimestamp = null;
+    document.getElementById('btn-play').textContent = '▶ Oynat';
+    return;
+  }
+
+  animRAF = requestAnimationFrame(animStep);
+}
+
+function animPlay() {
+  if (!stitchSeq.length) return;
+  if (animRunning) {
+    // Pause
+    animRunning = false;
+    _lastTimestamp = null;
+    if (animRAF) cancelAnimationFrame(animRAF);
+    document.getElementById('btn-play').textContent = '▶ Oynat';
+  } else {
+    if (animIdx >= stitchSeq.length) animRestart();
+    animRunning = true;
+    _lastTimestamp = null;
+    document.getElementById('btn-play').textContent = '⏸ Duraklat';
+    animRAF = requestAnimationFrame(animStep);
+  }
+}
+
+function animRestart() {
+  animRunning = false;
+  _lastTimestamp = null;
+  if (animRAF) cancelAnimationFrame(animRAF);
+  animIdx    = 0;
+  animLastPx = null;
+  if (animCtx) {
+    animCtx.fillStyle = '#ffffff';
+    animCtx.fillRect(0, 0, animCanvas.width, animCanvas.height);
+  }
+  const totalStitches = stitchSeq.filter(s => s.cmd === STITCH_CMD).length;
+  document.getElementById('anim-progress').textContent = '0 / ' + totalStitches + ' dikis';
+  document.getElementById('btn-play').textContent = '▶ Oynat';
+}
+
+function downloadGif(e) {
+  if (!currentJobId) { e.preventDefault(); return; }
+  document.getElementById('dl-gif').href = '/api/animation/' + currentJobId;
+}
+
+// ── Drag & drop ──────────────────────────────────────────────────────────────
+const dropzone  = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+const thumb     = document.getElementById('thumb');
+const thumbWrap = document.getElementById('thumb-wrap');
+
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f) previewFile(f);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) previewFile(fileInput.files[0]);
+});
+
+function previewFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    thumb.src = e.target.result;
+    thumbWrap.style.display = 'block';
+    // Auto-compute aspect ratio
+    const img = new Image();
+    img.onload = () => {
+      const wEl = document.getElementById('width_mm');
+      const hEl = document.getElementById('height_mm');
+      if (wEl.value && parseFloat(wEl.value) > 0) {
+        hEl.value = Math.round(parseFloat(wEl.value) * img.naturalHeight / img.naturalWidth);
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Dimension linking ─────────────────────────────────────────────────────────
+document.getElementById('width_mm').addEventListener('input', function() {
+  if (!thumb.src || !thumb.naturalWidth) return;
+  const h = Math.round(parseFloat(this.value) * thumb.naturalHeight / thumb.naturalWidth);
+  if (!isNaN(h)) document.getElementById('height_mm').value = h;
+});
+
+// ── Advanced toggle ───────────────────────────────────────────────────────────
+function toggleAdv() {
+  const p = document.getElementById('adv-panel');
+  const b = document.querySelector('.adv-toggle');
+  const open = p.classList.toggle('open');
+  b.textContent = open ? '⚙ Ayarlari gizle ↑' : '⚙ Ayarlari goster ↓';
+}
+
+// ── Generate ──────────────────────────────────────────────────────────────────
+async function generate() {
+  if (!fileInput.files[0]) {
+    alert('Lutfen once bir gorsel yukleyin.');
+    return;
+  }
+
+  // UI: loading state
+  const btn     = document.getElementById('btn-gen');
+  const spinner = document.getElementById('spinner');
+  const btnTxt  = document.getElementById('btn-text');
+  btn.disabled  = true;
+  spinner.style.display = 'block';
+  btnTxt.textContent    = 'Isleniyor...';
+  hideError();
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('empty-state').style.display = 'none';
+
+  const fd = new FormData();
+  fd.append('image',                  fileInput.files[0]);
+  fd.append('width_mm',               document.getElementById('width_mm').value);
+  fd.append('height_mm',              document.getElementById('height_mm').value);
+  fd.append('max_colors',             document.getElementById('max_colors').value);
+  fd.append('hoop',                   document.getElementById('hoop').value);
+  fd.append('spacing_mm',             document.getElementById('spacing_mm').value);
+  fd.append('angle_deg',              document.getElementById('angle_deg').value);
+  fd.append('pull_compensation_mm',   document.getElementById('pull_compensation_mm').value);
+  fd.append('underlay',               document.getElementById('underlay').checked);
+  fd.append('trim_jumps',             document.getElementById('trim_jumps').checked);
+
+  try {
+    const resp = await fetch('/api/generate', { method: 'POST', body: fd });
+    const data = await resp.json();
+
+    if (!resp.ok || data.error) {
+      showError(data.error || 'Bilinmeyen hata.');
+      return;
+    }
+
+    showResults(data);
+  } catch (err) {
+    showError('Sunucuya ulasılamadi: ' + err.message);
+  } finally {
+    btn.disabled  = false;
+    spinner.style.display = 'none';
+    btnTxt.textContent    = '▶ DST Uret';
+  }
+}
+
+function showResults(data) {
+  currentJobId = data.job_id;
+  const s = data.stats;
+
+  // Preview
+  document.getElementById('preview-img').src = 'data:image/png;base64,' + data.preview_b64;
+  document.getElementById('scale-left').textContent  = '0 mm';
+  document.getElementById('scale-right').textContent = s.actual_w_mm + ' × ' + s.actual_h_mm + ' mm  (hedef: ' + s.target_w_mm + ' × ' + s.target_h_mm + ' mm)';
+
+  // Init canvas animation with stitch sequence from API
+  if (data.stitch_seq && data.stitch_seq.length) {
+    animInit(data.stitch_seq.map(row => ({
+      x: row[0], y: row[1], cmd: row[2], blk: row[3], r: row[4], g: row[5], b: row[6]
+    })));
+  }
+
+  // Stats
+  document.getElementById('st-stitches').textContent = s.total_stitches.toLocaleString('tr-TR');
+  document.getElementById('st-colors').textContent   = s.n_color_blocks;
+  document.getElementById('st-size').textContent     = s.actual_w_mm + ' × ' + s.actual_h_mm;
+
+  // Validation
+  const badge   = document.getElementById('val-badge');
+  const msgList = document.getElementById('msg-list');
+  msgList.innerHTML = '';
+
+  if (s.validation_ok && s.errors.length === 0) {
+    badge.innerHTML = '<span class="badge ok">&#10003; Dogrulama gecti</span>';
+  } else {
+    badge.innerHTML = '<span class="badge err">&#9888; Hatalar var</span>';
+  }
+
+  s.errors.forEach(e => {
+    const li = document.createElement('li');
+    li.className = 'err'; li.textContent = '✖ ' + e;
+    msgList.appendChild(li);
+  });
+  s.warnings.forEach(w => {
+    const li = document.createElement('li');
+    li.className = 'warn'; li.textContent = '⚠ ' + w;
+    msgList.appendChild(li);
+  });
+
+  // Downloads
+  document.getElementById('dl-dst').href     = '/api/download/' + currentJobId + '/dst';
+  document.getElementById('dl-report').href  = '/api/download/' + currentJobId + '/report';
+  document.getElementById('dl-preview').href = '/api/download/' + currentJobId + '/preview';
+
+  document.getElementById('results').style.display     = 'flex';
+  document.getElementById('empty-state').style.display = 'none';
+}
+
+function showError(msg) {
+  const b = document.getElementById('error-banner');
+  b.textContent = '⚠ ' + msg;
+  b.style.display = 'block';
+  document.getElementById('empty-state').style.display = 'flex';
+}
+
+function hideError() {
+  document.getElementById('error-banner').style.display = 'none';
+}
+</script>
+
+</body>
+</html>

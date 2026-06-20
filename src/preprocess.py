@@ -14,6 +14,7 @@ from src.config import Config
 MIN_PX_PER_MM: float = 10.0  # minimum output resolution
 ALPHA_THRESH:  int   = 128   # alpha < this → background
 MEDIAN_KSIZE:  int   = 3     # median blur kernel size (must be odd)
+BG_BRIGHT_THRESH: int = 240  # RGB pixels with all channels > this = near-white background
 
 
 def load_and_scale(
@@ -84,8 +85,10 @@ def remove_background(img_rgba: np.ndarray) -> np.ndarray:
     alpha = img_rgba[:, :, 3]
     if int(alpha.min()) < ALPHA_THRESH:
         return alpha >= ALPHA_THRESH
-    # Opaque image — no transparency info; treat all pixels as foreground.
-    return np.ones(img_rgba.shape[:2], dtype=bool)
+    # Opaque image — detect near-white background by brightness threshold.
+    rgb = img_rgba[:, :, :3]
+    near_white = np.all(rgb > BG_BRIGHT_THRESH, axis=2)
+    return ~near_white
 
 
 def denoise(img: np.ndarray) -> np.ndarray:

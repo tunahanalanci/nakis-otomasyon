@@ -75,11 +75,12 @@ def mask_to_polygons(
 
 
 def px_to_mm(geom: Polygon, px_per_mm: float) -> Polygon:
-    """Scale *geom* coordinates from pixels to millimetres.
+    """Scale *geom* from pixel coordinates to millimetres.
 
-    Applies a uniform scale of ``1 / px_per_mm`` about the origin so that
-    the resulting coordinates are in mm.  Interior rings (holes) are scaled
-    correctly by :func:`shapely.affinity.scale`.
+    Coordinate convention: Y stays DOWN (y=0 at top, increasing downward),
+    matching image pixel space.  Y is NOT flipped here.  The single Y-flip
+    needed for the machine lives in ``src.export_dst.export`` (controlled by
+    ``cfg.dst_flip_y``).
 
     Parameters
     ----------

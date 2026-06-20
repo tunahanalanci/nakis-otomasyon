@@ -133,60 +133,56 @@ def validate(dst_path: str | Path, cfg: Config) -> ValidationReport:
 
 
 def render_preview(
-    dst_path: str | Path,
+    blocks: list,
+    palette: list[tuple[int, int, int]],
     out_png: str | Path,
     scale: float = 3.0,
 ) -> Path:
-    """Render the stitch path in *dst_path* to *out_png* at *scale* px/mm.
+    """Render stitch blocks to *out_png* at *scale* px/mm.
 
-    Each colour segment is drawn in a different colour from *_PREVIEW_COLORS*.
-    JUMP and TRIM commands lift the needle (break the drawn line); COLOR_CHANGE
-    advances the colour; END stops rendering.
+    Blocks are in internal Y-DOWN mm coordinates (same as the image).
+    No Y-flip is applied here — the preview matches the input image orientation.
+    Each colour block is drawn in its actual palette colour.
+
+    Parameters
+    ----------
+    blocks  : list of StitchBlock (color_idx + points in Y-down mm).
+    palette : list of (R, G, B) tuples from quantisation.
+    out_png : output PNG path.
+    scale   : pixels per millimetre for the preview image.
     """
     out_png = Path(out_png)
-    pattern  = pyembroidery.read(str(dst_path))
-    stitches = pattern.stitches
 
-    stitch_pts = _stitch_points(stitches)
-
-    if not stitch_pts:
+    # Collect all stitch points to compute bounding box.
+    all_pts: list[tuple[float, float]] = [
+        pt for blk in blocks for pt in blk.points
+    ]
+    if not all_pts:
         Image.new("RGB", (100, 100), _PREVIEW_BG).save(str(out_png))
         return out_png
 
-    xs = [p[0] for p in stitch_pts]
-    ys = [p[1] for p in stitch_pts]
-    min_x, max_x = min(xs), max(xs)
-    min_y, max_y = min(ys), max(ys)
+    xs = [p[0] for p in all_pts]
+    ys = [p[1] for p in all_pts]
+    min_x, min_y = min(xs), min(ys)
+    max_x, max_y = max(xs), max(ys)
 
-    # DST unit = 0.1 mm  →  scale_dst = scale [px/mm] × 0.1 [mm/DST] = scale/10
-    scale_dst = scale / 10.0
     pad = _PREVIEW_PAD
-
-    img_w = max(1, int((max_x - min_x) * scale_dst)) + 2 * pad
-    img_h = max(1, int((max_y - min_y) * scale_dst)) + 2 * pad
+    img_w = max(1, int((max_x - min_x) * scale)) + 2 * pad
+    img_h = max(1, int((max_y - min_y) * scale)) + 2 * pad
     img   = Image.new("RGB", (img_w, img_h), _PREVIEW_BG)
     draw  = ImageDraw.Draw(img)
 
-    color_idx = 0
-    prev: tuple[int, int] | None = None
+    colors = palette if palette else _PREVIEW_COLORS
 
-    for sx, sy, cmd in stitches:
-        if cmd == pyembroidery.END:
-            break
-        elif cmd == pyembroidery.COLOR_CHANGE:
-            color_idx = (color_idx + 1) % len(_PREVIEW_COLORS)
-            prev = None
-        elif cmd in (pyembroidery.TRIM, pyembroidery.JUMP):
-            prev = None
-        elif cmd == pyembroidery.STITCH:
-            px = int((sx - min_x) * scale_dst) + pad
-            py = int((max_y - sy) * scale_dst) + pad   # flip Y for image coords
+    for blk in blocks:
+        color = colors[blk.color_idx % len(colors)]
+        prev: tuple[int, int] | None = None
+        for x, y in blk.points:
+            # Y-DOWN mm → Y-DOWN pixels (no flip needed, same convention)
+            px = int((x - min_x) * scale) + pad
+            py = int((y - min_y) * scale) + pad
             if prev is not None:
-                draw.line(
-                    [prev, (px, py)],
-                    fill=_PREVIEW_COLORS[color_idx % len(_PREVIEW_COLORS)],
-                    width=1,
-                )
+                draw.line([prev, (px, py)], fill=color, width=1)
             prev = (px, py)
 
     img.save(str(out_png))

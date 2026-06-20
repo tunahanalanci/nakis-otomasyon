@@ -45,13 +45,37 @@ def export(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    pattern = pyembroidery.EmbPattern()
     color_segments = _group_by_color(blocks)
 
-    prev_end: tuple[float, float] | None = None
-    total_stitches = 0
+    # Collect all stitch points to determine Y bounds for the flip.
     all_xs: list[float] = []
     all_ys: list[float] = []
+    for seg in color_segments:
+        for blk in seg:
+            for x, y in blk.points:
+                all_xs.append(x)
+                all_ys.append(y)
+
+    if not all_xs:
+        # Nothing to write — produce an empty DST and return.
+        pattern = pyembroidery.EmbPattern()
+        pattern.add_stitch_absolute(pyembroidery.END, 0, 0)
+        dst_path = out_dir / f"{stem}.dst"
+        pyembroidery.write(pattern, str(dst_path))
+        _write_color_report(color_segments, palette, out_dir / "renk_sirasi.txt")
+        return ExportStats(0, 0, (0.0, 0.0, 0.0, 0.0), dst_path)
+
+    min_y, max_y = min(all_ys), max(all_ys)
+
+    def _y_out(y: float) -> int:
+        # Single authoritative Y-flip: internal Y-down → machine Y-up.
+        # Controlled by cfg.dst_flip_y; only this line must change if the
+        # machine convention differs.
+        return _to_dst(min_y + max_y - y) if cfg.dst_flip_y else _to_dst(y)
+
+    pattern = pyembroidery.EmbPattern()
+    prev_end: tuple[float, float] | None = None
+    total_stitches = 0
 
     for seg_idx, seg in enumerate(color_segments):
         if seg_idx > 0:
@@ -73,22 +97,20 @@ def export(
                         pattern.add_stitch_absolute(
                             pyembroidery.TRIM,
                             _to_dst(prev_end[0]),
-                            _to_dst(prev_end[1]),
+                            _y_out(prev_end[1]),
                         )
                     pattern.add_stitch_absolute(
                         pyembroidery.JUMP,
                         _to_dst(blk_start[0]),
-                        _to_dst(blk_start[1]),
+                        _y_out(blk_start[1]),
                     )
 
             for x, y in blk.points:
                 pattern.add_stitch_absolute(
                     pyembroidery.STITCH,
                     _to_dst(x),
-                    _to_dst(y),
+                    _y_out(y),
                 )
-                all_xs.append(x)
-                all_ys.append(y)
                 total_stitches += 1
 
             prev_end = blk.points[-1]
