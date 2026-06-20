@@ -552,7 +552,12 @@ input:checked + .slider:before { transform: translateX(16px); }
           <a class="btn-dl" id="dl-dst"     href="#">&#128190; DST Dosyasi</a>
           <a class="btn-dl" id="dl-report"  href="#">&#128196; Renk Sirasi</a>
           <a class="btn-dl" id="dl-preview" href="#">&#128247; Onizleme PNG</a>
+          <a class="btn-dl" id="dl-svg"     href="#" style="display:none;">&#128396; SVG Indir</a>
         </div>
+        <p id="svg-hint" style="display:none;margin-top:10px;font-size:0.78rem;color:var(--muted);line-height:1.5;">
+          &#9432; Sonucu begenmezsen bu SVG'yi <strong style="color:var(--text);">Inkscape + Ink/Stitch</strong> ile acip
+          elle duzeltebilirsin (dikis tipi, aci, sira). Ink/Stitch &rarr; DST olarak kaydet.
+        </p>
       </div>
 
     </div>
@@ -903,6 +908,17 @@ function showResults(data) {
   document.getElementById('dl-dst').href     = '/api/download/' + currentJobId + '/dst';
   document.getElementById('dl-report').href  = '/api/download/' + currentJobId + '/report';
   document.getElementById('dl-preview').href = '/api/download/' + currentJobId + '/preview';
+
+  const dlSvg  = document.getElementById('dl-svg');
+  const svgHint = document.getElementById('svg-hint');
+  if (data.has_svg) {
+    dlSvg.href = '/api/download/' + currentJobId + '/svg';
+    dlSvg.style.display = '';
+    svgHint.style.display = '';
+  } else {
+    dlSvg.style.display = 'none';
+    svgHint.style.display = 'none';
+  }
 
   document.getElementById('results').style.display     = 'flex';
   document.getElementById('empty-state').style.display = 'none';

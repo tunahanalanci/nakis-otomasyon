@@ -17,6 +17,8 @@ env/
 # Output artifacts
 out/*
 !out/ui_screenshot.png
+!out/surec.gif
+!out/anim_frames.png
 *.dst
 *.pes
 *.jef

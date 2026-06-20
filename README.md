@@ -143,6 +143,19 @@ python scripts/show_engine_output.py
 | Dolgu kalitesi | |
 | Renk durması çalışıyor mu? | |
 
+## Elle İnce Ayar (Inkscape + Ink/Stitch)
+
+Web arayüzü DST üretirken aynı zamanda Ink/Stitch uyumlu bir **SVG** de kaydeder.
+"SVG İndir" butonu ile indirip Inkscape'te elle düzeltebilirsin:
+
+1. **SVG'yi Inkscape'te aç** — `Dosya → Aç` → indirilen `nakis_tasarim.svg`
+2. **Parametreleri düzenle** — bir katmana tıkla → Ink/Stitch → Parametreler:
+   dikiş tipi (auto_fill / contour_fill / running_stitch), dolgu açısı, satır aralığı
+3. **DST olarak kaydet** — `Dosya → Farklı Kaydet` → *Ink/Stitch: Tajima (.dst)* formatını seç
+4. **Operatör raporu** — renk sırasını `renk_sirasi.txt`'deki iplik atamaları ile eşleştir
+
+> Ink/Stitch kurulu değilse: [inkstitch.org](https://inkstitch.org) → Eklentiler → kurulum kılavuzu.
+
 ## Testler
 
 ```bash
