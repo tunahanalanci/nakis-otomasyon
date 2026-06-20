@@ -39,7 +39,12 @@ class Config:
     min_stitch_mm: float = 0.5
     trim_jumps: bool = True
     output_format: str = "dst"
-    dst_flip_y: bool = True   # flip Y at DST export so machine sees Y-up
+    dst_flip_y: bool = True       # flip Y at DST export so machine sees Y-up
+    # Ink/Stitch engine settings
+    use_inkstitch: bool = True    # aktif motor: True=Ink/Stitch, False=legacy
+    satin_max_width_mm: float = 3.0   # genislik < bu → contour_fill (satin benzeri)
+    running_max_width_mm: float = 1.0  # genislik < bu → running_stitch
+    thread_brand: str = "isacord.json"  # iplik katalogu dosya adi
 
 
 def load(path: str | Path) -> Config:
@@ -66,4 +71,8 @@ def load(path: str | Path) -> Config:
         trim_jumps=raw.get("trim_jumps", True),
         output_format=raw.get("output_format", "dst"),
         dst_flip_y=raw.get("dst_flip_y", True),
+        use_inkstitch=raw.get("use_inkstitch", True),
+        satin_max_width_mm=raw.get("satin_max_width_mm", 3.0),
+        running_max_width_mm=raw.get("running_max_width_mm", 1.0),
+        thread_brand=raw.get("thread_brand", "isacord.json"),
     )

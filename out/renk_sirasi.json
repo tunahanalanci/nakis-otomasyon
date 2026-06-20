@@ -1,0 +1,18 @@
+[
+  {
+    "sira": 1,
+    "iplik_kodu": "0588",
+    "iplik_adi": "Dark Steel Blue",
+    "bulunan_hex": "#2b3b4a",
+    "iplik_hex": "#28374b",
+    "delta_e": 3.9
+  },
+  {
+    "sira": 2,
+    "iplik_kodu": "0741",
+    "iplik_adi": "Toast",
+    "bulunan_hex": "#aa8a50",
+    "iplik_hex": "#aa824b",
+    "delta_e": 4.6
+  }
+]

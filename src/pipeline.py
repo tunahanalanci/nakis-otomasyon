@@ -1,4 +1,8 @@
-"""Top-level pipeline: orchestrates all stages from PNG to DST output."""
+"""Top-level pipeline: orchestrates all stages from PNG to DST output.
+
+Active engine: Ink/Stitch (use_inkstitch=True in Config).
+Legacy engine path kept in legacy/ for reference.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +18,7 @@ from src.export_dst import ExportStats, export as _export_dst
 from src.optimize import StitchBlock, optimize
 from src.preprocess import load_and_scale
 from src.separate import clean_mask, masks_from_labels
+from src.threads import match_palette, write_color_report
 from src.validate import ValidationReport, render_preview, validate
 from src.vectorize import vectorize_masks
 
@@ -91,37 +96,29 @@ def run(
     raw_masks = masks_from_labels(label_map, len(palette))
     masks     = [clean_mask(m) for m in raw_masks]
 
-    # ── 4. Vectorise — polygons in mm ─────────────────────────────────────────
+    # ── 4. Thread matching (Lab color distance) ───────────────────────────────
+    thread_matches = match_palette(palette, cfg.thread_brand)
+
+    if cfg.use_inkstitch:
+        return _run_inkstitch(
+            stem, png_path, out_dir, cfg,
+            masks, palette, thread_matches, px_per_mm, usb_path, usb_layout,
+        )
+
+    # ── Legacy path ───────────────────────────────────────────────────────────
     polygons_by_color = vectorize_masks(masks, px_per_mm, min_area_mm2=1.0)
-
-    # ── 5. Stitch generation ──────────────────────────────────────────────────
     blocks = _generate_blocks(polygons_by_color, cfg)
-
-    # ── 6. Optimise ───────────────────────────────────────────────────────────
     blocks = optimize(blocks, cfg)
-
-    # ── 7. Export DST ─────────────────────────────────────────────────────────
     export_stats: ExportStats = _export_dst(blocks, palette, cfg, out_dir, stem=stem)
     color_report_path = out_dir / "renk_sirasi.txt"
+    write_color_report(thread_matches, color_report_path)
+    validation   = validate(export_stats.dst_path, cfg)
+    preview_path = render_preview(blocks, palette, out_dir / f"{stem}_preview.png")
 
-    # ── 8. Validate + preview ─────────────────────────────────────────────────
-    validation    = validate(export_stats.dst_path, cfg)
-    preview_path  = render_preview(
-        blocks,
-        palette,
-        out_dir / f"{stem}_preview.png",
-    )
-
-    # ── 9. Optional USB copy ──────────────────────────────────────────────────
     if usb_path is not None:
         from src.usb_writer import write_to_usb  # noqa: PLC0415
-        write_to_usb(
-            export_stats.dst_path,
-            color_report_path,
-            usb_path,
-            preview_path=preview_path,
-            layout=usb_layout,
-        )
+        write_to_usb(export_stats.dst_path, color_report_path, usb_path,
+                     preview_path=preview_path, layout=usb_layout)
 
     return PipelineResult(
         dst_path          = export_stats.dst_path,
@@ -133,6 +130,58 @@ def run(
         validation        = validation,
         palette           = palette,
         blocks            = blocks,
+    )
+
+
+def _run_inkstitch(
+    stem, png_path, out_dir, cfg,
+    masks, palette, thread_matches, px_per_mm, usb_path, usb_layout,
+):
+    """Ink/Stitch engine path: SVG → headless Inkscape → DST."""
+    from src.inkstitch_engine import build_svg, export_dst, render_dst_preview  # noqa
+
+    svg_path     = out_dir / f"{stem}.svg"
+    dst_path     = out_dir / f"{stem}.dst"
+    preview_path = out_dir / f"{stem}_preview.png"
+    report_path  = out_dir / "renk_sirasi.txt"
+
+    stitch_summary = build_svg(
+        masks, thread_matches, px_per_mm,
+        cfg.width_mm, cfg.height_mm, cfg,
+        svg_path,
+    )
+
+    ok = export_dst(svg_path, dst_path)
+    if not ok:
+        raise RuntimeError(f"Ink/Stitch DST export basarisiz: {dst_path}")
+
+    write_color_report(thread_matches, report_path)
+    render_dst_preview(dst_path, thread_matches, preview_path)
+
+    import pyembroidery
+    pat = pyembroidery.read(str(dst_path))
+    stitch_pts = [s for s in pat.stitches if s[2] == pyembroidery.STITCH]
+    cc = [s for s in pat.stitches if s[2] == pyembroidery.COLOR_CHANGE]
+    xs = [s[0] for s in stitch_pts] or [0]
+    ys = [s[1] for s in stitch_pts] or [0]
+
+    validation = validate(dst_path, cfg)
+
+    if usb_path is not None:
+        from src.usb_writer import write_to_usb  # noqa: PLC0415
+        write_to_usb(dst_path, report_path, usb_path,
+                     preview_path=preview_path, layout=usb_layout)
+
+    return PipelineResult(
+        dst_path          = dst_path,
+        preview_path      = preview_path,
+        color_report_path = report_path,
+        total_stitches    = len(stitch_pts),
+        n_color_blocks    = len(cc) + 1,
+        bounds_mm         = (min(xs)/10, min(ys)/10, max(xs)/10, max(ys)/10),
+        validation        = validation,
+        palette           = palette,
+        blocks            = [],   # Ink/Stitch engine; blok listesi DST'den
     )
 
 
