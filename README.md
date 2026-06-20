@@ -82,6 +82,44 @@ options:
 | `out/<isim>_preview.png` | Dikiş yolu önizlemesi |
 | `out/renk_sirasi.txt` | Renk sırası raporu (operatör kılavuzu) |
 
+## Ink/Stitch Motoru (feat/inkstitch-engine)
+
+Mevcut el yazımı stitch motoruna alternatif olarak **Inkscape + Ink/Stitch** tabanlı motor.
+
+### Kurulum
+
+1. **Inkscape 1.4+** kur (Windows MSI: https://inkscape.org/release/ )
+2. **Ink/Stitch** eklentisini kullanıcı extensions klasörüne kur:
+   ```powershell
+   # Ink/Stitch v3.2.2 zip'i indir
+   Invoke-WebRequest -Uri "https://github.com/inkstitch/inkstitch/releases/download/v3.2.2/inkstitch-v3.2.2-windows-64bit.zip" `
+     -OutFile "$env:TEMP\inkstitch.zip"
+   # Kullanici extensions klasorune cikart
+   Expand-Archive "$env:TEMP\inkstitch.zip" "$env:APPDATA\inkscape\extensions" -Force
+   ```
+
+### Headless DST export (komut satırı)
+
+```powershell
+inkscape --batch-process `
+  "--actions=select-all;org.inkstitch.output.dst;export-filename:out.dst;export-do" `
+  input.svg
+```
+
+### POC testi
+
+```bash
+python scripts/inkstitch_poc.py
+# Cikti: out/poc.dst, out/poc_preview.png
+```
+
+### Logo isleme
+
+```bash
+python scripts/inkstitch_logo.py
+# Cikti: out/logo_inkstitch.dst, out/logo_inkstitch_preview.png
+```
+
 ## Testler
 
 ```bash

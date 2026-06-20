@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:inkstitch="http://inkstitch.org/namespace"
+     width="60mm" height="60mm"
+     viewBox="0 0 60 60">
+  <g inkscape:label="Lacivert" inkscape:groupmode="layer">
+    <!-- Dolu daire: merkez (22,30) r=18 mm -->
+    <circle cx="22" cy="30" r="18"
+            fill="#1a3a6e"
+            inkstitch:fill_method="auto_fill"
+            inkstitch:angle="45"
+            inkstitch:row_spacing_mm="0.4" />
+  </g>
+  <g inkscape:label="Altin" inkscape:groupmode="layer">
+    <!-- Ince serit: x=46..54, y=8..52 -->
+    <rect x="46" y="8" width="8" height="44"
+          fill="#a8874b"
+          inkstitch:fill_method="auto_fill"
+          inkstitch:angle="90"
+          inkstitch:row_spacing_mm="0.4" />
+  </g>
+</svg>
