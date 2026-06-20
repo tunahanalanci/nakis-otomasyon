@@ -54,8 +54,16 @@ FILL_ANGLE   = 45    # derece
 
 # ── SVG path uretimi ──────────────────────────────────────────────────────────
 
-def mask_to_svg_paths(mask: np.ndarray, px_per_mm: float) -> list[str]:
-    """Boolean HxW mask → SVG <path> data stringlari listesi (delikler dahil)."""
+# Kucuk sekiller icin alan esigi (mm²): bunlar auto_fill yerine running_stitch alir
+_SMALL_SHAPE_MM2 = 15.0
+
+
+def mask_to_svg_paths(mask: np.ndarray, px_per_mm: float) -> list[tuple[str, float]]:
+    """Boolean HxW mask → (SVG path data, alan_mm2) tuple listesi.
+
+    Delikler evenodd kuraliyla dis konturun path'ine dahil edilir.
+    Alan hesabi ic delikler dahil edilmeden dis konturun gerc ek alan.
+    """
     uint_mask = (mask.astype(np.uint8) * 255)
     contours, hierarchy = cv2.findContours(
         uint_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_TC89_KCOS
@@ -68,18 +76,19 @@ def mask_to_svg_paths(mask: np.ndarray, px_per_mm: float) -> list[str]:
 
     for i, cnt in enumerate(contours):
         if hier[i][3] != -1:
-            continue  # ic kontur (delik) → dis konturun path'ine dahil edilecek
+            continue  # ic kontur (delik) — dis konturun path'ine eklenir
 
-        # Dis kontur → M ... Z
+        area_px  = cv2.contourArea(cnt)
+        area_mm2 = area_px / (px_per_mm ** 2)
+
         path = _contour_to_path(cnt, px_per_mm)
 
-        # Cocuk (delik) konturlari ekle
         child = hier[i][2]
         while child != -1:
             path += " " + _contour_to_path(contours[child], px_per_mm)
-            child = hier[child][0]  # kardes
+            child = hier[child][0]
 
-        paths.append(path)
+        paths.append((path, area_mm2))
 
     return paths
 
@@ -131,17 +140,31 @@ def build_svg(
         path_datas = mask_to_svg_paths(mask, px_per_mm)
         print(f"[logo] Renk {idx} ({hex_color}): {len(path_datas)} kontur")
 
-        for pd in path_datas:
+        for pd, area_mm2 in path_datas:
             if not pd.strip():
                 continue
-            lines.append(
-                f'    <path d="{pd}"'
-                f' fill="{hex_color}"'
-                f' fill-rule="evenodd"'
-                f' inkstitch:fill_method="auto_fill"'
-                f' inkstitch:angle="{angle}"'
-                f' inkstitch:row_spacing_mm="{FILL_SPACING}" />'
-            )
+            if area_mm2 < 0.5:  # sub-pixel gurultu — atla
+                continue
+            if area_mm2 < _SMALL_SHAPE_MM2:
+                # Kucuk sekil: running stitch kontur — auto_fill bu boyutta kaba cikti
+                print(f"[logo]   Kucuk sekil {area_mm2:.1f}mm2 -> running_stitch")
+                lines.append(
+                    f'    <path d="{pd}"'
+                    f' fill="none"'
+                    f' stroke="{hex_color}"'
+                    f' stroke-width="0.4"'
+                    f' inkstitch:stroke_method="running_stitch"'
+                    f' inkstitch:running_stitch_length_mm="1.5" />'
+                )
+            else:
+                lines.append(
+                    f'    <path d="{pd}"'
+                    f' fill="{hex_color}"'
+                    f' fill-rule="evenodd"'
+                    f' inkstitch:fill_method="auto_fill"'
+                    f' inkstitch:angle="{angle}"'
+                    f' inkstitch:row_spacing_mm="{FILL_SPACING}" />'
+                )
 
         lines.append("  </g>")
 
