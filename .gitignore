@@ -15,7 +15,8 @@ env/
 .env
 
 # Output artifacts
-out/
+out/*
+!out/ui_screenshot.png
 *.dst
 *.pes
 *.jef
