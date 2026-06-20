@@ -33,6 +33,7 @@ class PipelineResult:
     n_color_blocks:    int
     bounds_mm:         tuple[float, float, float, float]  # minx miny maxx maxy
     validation:        ValidationReport
+    palette:           list[tuple[int, int, int]]
 
 
 def run(
@@ -107,6 +108,7 @@ def run(
     preview_path  = render_preview(
         export_stats.dst_path,
         out_dir / f"{stem}_preview.png",
+        palette=palette,
     )
 
     # ── 9. Optional USB copy ──────────────────────────────────────────────────
@@ -128,6 +130,7 @@ def run(
         n_color_blocks    = export_stats.n_color_blocks,
         bounds_mm         = export_stats.bounds_mm,
         validation        = validation,
+        palette           = palette,
     )
 
 

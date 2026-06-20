@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import cv2
 import numpy as np
-from shapely.affinity import scale as shp_scale
+from shapely.affinity import scale as shp_scale, translate as shp_translate
 from shapely.geometry import MultiPolygon, Polygon
 
 
@@ -74,19 +74,33 @@ def mask_to_polygons(
     return MultiPolygon(polygons)
 
 
-def px_to_mm(geom: Polygon, px_per_mm: float) -> Polygon:
-    """Scale *geom* coordinates from pixels to millimetres.
+def px_to_mm(geom: Polygon, px_per_mm: float, img_h_px: float = 0) -> Polygon:
+    """Scale *geom* from pixel coordinates to millimetres, flipping Y once.
 
-    Applies a uniform scale of ``1 / px_per_mm`` about the origin so that
-    the resulting coordinates are in mm.  Interior rings (holes) are scaled
-    correctly by :func:`shapely.affinity.scale`.
+    Image pixel space has Y increasing downward (y=0 at top).
+    Embroidery / DST space uses Y increasing upward (mathematical convention).
+    This function applies the single authoritative Y flip:
+
+        x_mm = x_px / px_per_mm
+        y_mm = (img_h_px - y_px) / px_per_mm
+
+    so that downstream code (fill, export, preview) all operate in the same
+    "Y up" coordinate system and the preview render_preview flip is correct.
 
     Parameters
     ----------
     geom      : Polygon in pixel coordinates.
     px_per_mm : pixels-per-millimetre of the source image.
+    img_h_px  : total image height in pixels (required for Y flip).
+                When 0, falls back to the old (no-flip) behaviour.
     """
     factor = 1.0 / px_per_mm
+    if img_h_px > 0:
+        # Flip Y: scale with yfact=-factor (reflects around y=0), then
+        # translate up by img_h_mm so values land in [0, img_h_mm].
+        img_h_mm = img_h_px * factor
+        flipped  = shp_scale(geom, xfact=factor, yfact=-factor, origin=(0, 0))
+        return shp_translate(flipped, xoff=0, yoff=img_h_mm)
     return shp_scale(geom, xfact=factor, yfact=factor, origin=(0, 0))
 
 
@@ -119,12 +133,14 @@ def vectorize_masks(
     """
     result: list[list[Polygon]] = []
 
+    img_h_px = masks[0].shape[0] if masks else 0
+
     for mask in masks:
         multi    = mask_to_polygons(mask, simplify_px)
         polys_mm = [
-            px_to_mm(p, px_per_mm)
+            px_to_mm(p, px_per_mm, img_h_px)
             for p in multi.geoms
-            if px_to_mm(p, px_per_mm).area >= min_area_mm2
+            if px_to_mm(p, px_per_mm, img_h_px).area >= min_area_mm2
         ]
         # Largest area first so stitch engine processes dominant shapes first
         polys_mm.sort(key=lambda p: p.area, reverse=True)

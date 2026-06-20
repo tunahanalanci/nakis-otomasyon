@@ -136,6 +136,7 @@ def render_preview(
     dst_path: str | Path,
     out_png: str | Path,
     scale: float = 3.0,
+    palette: list[tuple[int, int, int]] | None = None,
 ) -> Path:
     """Render the stitch path in *dst_path* to *out_png* at *scale* px/mm.
 
@@ -167,6 +168,9 @@ def render_preview(
     img   = Image.new("RGB", (img_w, img_h), _PREVIEW_BG)
     draw  = ImageDraw.Draw(img)
 
+    # Use actual palette colors when provided, fall back to fixed palette
+    colors = palette if palette else _PREVIEW_COLORS
+
     color_idx = 0
     prev: tuple[int, int] | None = None
 
@@ -174,17 +178,17 @@ def render_preview(
         if cmd == pyembroidery.END:
             break
         elif cmd == pyembroidery.COLOR_CHANGE:
-            color_idx = (color_idx + 1) % len(_PREVIEW_COLORS)
+            color_idx += 1
             prev = None
         elif cmd in (pyembroidery.TRIM, pyembroidery.JUMP):
             prev = None
         elif cmd == pyembroidery.STITCH:
             px = int((sx - min_x) * scale_dst) + pad
-            py = int((max_y - sy) * scale_dst) + pad   # flip Y for image coords
+            py = int((max_y - sy) * scale_dst) + pad   # flip Y: DST Y-up → image Y-down
             if prev is not None:
                 draw.line(
                     [prev, (px, py)],
-                    fill=_PREVIEW_COLORS[color_idx % len(_PREVIEW_COLORS)],
+                    fill=colors[color_idx % len(colors)],
                     width=1,
                 )
             prev = (px, py)
