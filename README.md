@@ -120,6 +120,29 @@ python scripts/inkstitch_logo.py
 # Cikti: out/logo_inkstitch.dst, out/logo_inkstitch_preview.png
 ```
 
+### Motor ciktisini goster
+
+```bash
+python scripts/show_engine_output.py
+# Cikti: out/logo_inkstitch_preview.png (bilgi seridi), out/compare_logo.png,
+#        out/logo_process.gif, out/logo_test_80mm.dst, out/renk_sirasi.txt
+```
+
+### Makinede test (Tajima)
+
+1. `out/logo_test_80mm.dst` dosyasini FAT32 USB belleğe kopyala
+2. Tajima'da aç ve renk sirasini `out/renk_sirasi.txt`'ye gore iplik ata:
+   - 1. ilik → **Lacivert** (#2b3b4a)
+   - 2. ilik → **Altın** (#aa8a50)
+3. Dik; aşağıdakileri not et:
+
+| Kontrol | Sonuç |
+|---|---|
+| USB'de dosya klasörü/adı | |
+| Gerçek boyut (cetvelle ölç mm) | |
+| Dolgu kalitesi | |
+| Renk durması çalışıyor mu? | |
+
 ## Testler
 
 ```bash

@@ -1,0 +1,13 @@
+RENK SIRASI RAPORU - Gelin Tekstil Logo
+Dosya  : logo_test_80mm.dst
+Boyut  : 80.0 x 38.5 mm
+Dikis  : 3,171
+
+IPLIK SIRASI:
+----------------------------------------
+  1. Lacivert     #2b3b4a  RGB(43,59,74)
+  2. Altin        #aa8a50  RGB(170,138,80)
+----------------------------------------
+
+NOT: Makine her renk blogu sonunda durur.
+Operator iplik degerini yukardaki siraya gore atar.
