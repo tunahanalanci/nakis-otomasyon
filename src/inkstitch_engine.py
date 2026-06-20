@@ -135,9 +135,15 @@ def build_svg(
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<svg xmlns="http://www.w3.org/2000/svg"',
         '     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"',
+        '     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.0.dtd"',
         '     xmlns:inkstitch="http://inkstitch.org/namespace"',
+        '     inkstitch:version="3.2.2"',
         f'     width="{w_mm}mm" height="{h_mm}mm"',
         f'     viewBox="0 0 {w_mm} {h_mm}">',
+        # sodipodi:namedview is required so Inkscape does not treat the doc as uninitialized
+        '  <sodipodi:namedview'
+        '    inkscape:document-units="mm"'
+        '    units="mm" />',
     ]
 
     summary: dict[int, list[tuple[str, float]]] = {}
@@ -195,14 +201,30 @@ def build_svg(
 
 def export_dst(svg: Path, dst: Path, timeout: int = 300) -> bool:
     """Run headless Inkscape + Ink/Stitch to export SVG → DST."""
+    import os
     actions = (
-        f"select-all;"
+        "select-all;"
         f"org.inkstitch.output.dst;"
         f"export-filename:{dst};"
-        f"export-do"
+        "export-do"
     )
     cmd = [INKSCAPE, "--batch-process", f"--actions={actions}", str(svg)]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    env = os.environ.copy()
+    env["INKSCAPE_BATCH_PROCESS"] = "1"
+
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    si.wShowWindow = 0  # SW_HIDE
+
+    r = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env=env,
+        startupinfo=si,
+        creationflags=0x08000000,  # CREATE_NO_WINDOW
+    )
     ok = dst.exists() and dst.stat().st_size > 100
     return ok
 

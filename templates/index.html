@@ -293,6 +293,38 @@ input:checked + .slider:before { transform: translateX(16px); }
 }
 .btn-dl:hover { border-color: var(--accent); background: #1e1e46; }
 
+/* Thread list table */
+.thread-table {
+  width: 100%; border-collapse: collapse; font-size: 0.83rem;
+}
+.thread-table th {
+  text-align: left; padding: 6px 8px; color: var(--muted);
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; border-bottom: 1px solid var(--border);
+}
+.thread-table td { padding: 7px 8px; border-bottom: 1px solid #1e1e35; }
+.thread-table tr:last-child td { border-bottom: none; }
+.swatch {
+  display: inline-block; width: 18px; height: 18px;
+  border-radius: 4px; border: 1px solid rgba(255,255,255,.15);
+  vertical-align: middle; margin-right: 5px;
+}
+.delta-ok   { color: var(--ok); }
+.delta-warn { color: var(--warn); }
+.delta-bad  { color: var(--err); }
+
+/* Complexity warning banner */
+.complexity-banner {
+  background: #2a1e0a;
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  padding: 11px 16px;
+  color: var(--warn);
+  font-size: 0.85rem;
+  display: none;
+  margin-bottom: 4px;
+}
+
 /* Error banner */
 .error-banner {
   background: #2a0d0d;
@@ -406,6 +438,12 @@ input:checked + .slider:before { transform: translateX(16px); }
             <span class="slider"></span>
           </label>
         </div>
+        <div class="field">
+          <label>İplik markası</label>
+          <select id="thread_brand">
+            <option value="isacord.json">Isacord</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -426,6 +464,7 @@ input:checked + .slider:before { transform: translateX(16px); }
       <p style="font-size:0.8rem;">Sade, az renkli logolar en iyi sonucu verir.</p>
     </div>
 
+    <div class="complexity-banner" id="complexity-banner"></div>
     <div class="error-banner" id="error-banner"></div>
 
     <div id="results" style="display:none;flex-direction:column;gap:16px;">
@@ -488,6 +527,23 @@ input:checked + .slider:before { transform: translateX(16px); }
             <ul class="msg-list" id="msg-list"></ul>
           </div>
         </div>
+      </div>
+
+      <div class="card" style="grid-column: 1 / -1;" id="thread-card">
+        <h3>İplik Listesi</h3>
+        <table class="thread-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Kod</th>
+              <th>İplik Adı</th>
+              <th>Bulunan Renk</th>
+              <th>İplik Rengi</th>
+              <th>ΔE</th>
+            </tr>
+          </thead>
+          <tbody id="thread-tbody"></tbody>
+        </table>
       </div>
 
       <div class="card">
@@ -753,7 +809,9 @@ async function generate() {
   fd.append('pull_compensation_mm',   document.getElementById('pull_compensation_mm').value);
   fd.append('underlay',               document.getElementById('underlay').checked);
   fd.append('trim_jumps',             document.getElementById('trim_jumps').checked);
+  fd.append('thread_brand',           document.getElementById('thread_brand').value);
 
+  hideComplexityWarning();
   try {
     const resp = await fetch('/api/generate', { method: 'POST', body: fd });
     const data = await resp.json();
@@ -816,6 +874,31 @@ function showResults(data) {
     msgList.appendChild(li);
   });
 
+  // Thread list
+  const tbody = document.getElementById('thread-tbody');
+  tbody.innerHTML = '';
+  if (data.thread_list && data.thread_list.length) {
+    data.thread_list.forEach(t => {
+      const deltaClass = t.delta_e < 10 ? 'delta-ok' : t.delta_e < 25 ? 'delta-warn' : 'delta-bad';
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        `<td>${t.sira}</td>` +
+        `<td><strong>${t.iplik_kodu}</strong></td>` +
+        `<td>${t.iplik_adi}</td>` +
+        `<td><span class="swatch" style="background:${t.bulunan_hex}"></span>${t.bulunan_hex}</td>` +
+        `<td><span class="swatch" style="background:${t.iplik_hex}"></span>${t.iplik_hex}</td>` +
+        `<td class="${deltaClass}">${t.delta_e}</td>`;
+      tbody.appendChild(tr);
+    });
+    document.getElementById('thread-card').style.display = '';
+  } else {
+    document.getElementById('thread-card').style.display = 'none';
+  }
+
+  // Complexity warning (from backend)
+  const firstWarn = s.warnings.find(w => w.includes('Fotograf') || w.includes('cok renkli'));
+  if (firstWarn) showComplexityWarning(firstWarn);
+
   // Downloads
   document.getElementById('dl-dst').href     = '/api/download/' + currentJobId + '/dst';
   document.getElementById('dl-report').href  = '/api/download/' + currentJobId + '/report';
@@ -834,6 +917,16 @@ function showError(msg) {
 
 function hideError() {
   document.getElementById('error-banner').style.display = 'none';
+}
+
+function showComplexityWarning(msg) {
+  const b = document.getElementById('complexity-banner');
+  b.textContent = '⚠ ' + msg;
+  b.style.display = 'block';
+}
+
+function hideComplexityWarning() {
+  document.getElementById('complexity-banner').style.display = 'none';
 }
 </script>
 

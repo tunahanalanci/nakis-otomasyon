@@ -51,16 +51,17 @@ def generate():
 
     # ── Parse parameters ──────────────────────────────────────────────────────
     try:
-        width_mm   = float(request.form.get("width_mm",  80))
-        height_mm  = float(request.form.get("height_mm", 60))
-        max_colors = int(request.form.get("max_colors",  2))
-        spacing_mm = float(request.form.get("spacing_mm", 0.4))
-        angle_deg  = float(request.form.get("angle_deg",  45))
-        underlay   = request.form.get("underlay", "true").lower() == "true"
-        trim_jumps = request.form.get("trim_jumps", "true").lower() == "true"
-        pull_comp  = float(request.form.get("pull_compensation_mm", 0.2))
-        hoop_key   = request.form.get("hoop", "200x200")
+        width_mm      = float(request.form.get("width_mm",  80))
+        height_mm     = float(request.form.get("height_mm", 60))
+        max_colors    = int(request.form.get("max_colors",  2))
+        spacing_mm    = float(request.form.get("spacing_mm", 0.4))
+        angle_deg     = float(request.form.get("angle_deg",  45))
+        underlay      = request.form.get("underlay", "true").lower() == "true"
+        trim_jumps    = request.form.get("trim_jumps", "true").lower() == "true"
+        pull_comp     = float(request.form.get("pull_compensation_mm", 0.2))
+        hoop_key      = request.form.get("hoop", "200x200")
         hoop_w, hoop_h = HOOP_SIZES.get(hoop_key, (200, 200))
+        thread_brand  = request.form.get("thread_brand", "isacord.json")
     except (ValueError, TypeError) as exc:
         return jsonify({"error": f"Gecersiz parametre: {exc}"}), 400
 
@@ -72,10 +73,17 @@ def generate():
     img_path = job_dir / f"input{suffix}"
     file.save(str(img_path))
 
-    # ── Aspect-ratio preservation ─────────────────────────────────────────────
+    # ── Aspect-ratio preservation + complexity check ──────────────────────────
     from PIL import Image as PilImage
+    complexity_warning = None
     with PilImage.open(str(img_path)) as pil:
         iw, ih = pil.size
+        unique_colors = len(set(pil.convert("RGB").getdata()))
+        if unique_colors > 500:
+            complexity_warning = (
+                "Fotograf veya cok renkli gorsel tespit edildi. "
+                "Sade, az renkli logolar cok daha iyi sonuc verir."
+            )
     if width_mm <= 0 and height_mm > 0:
         width_mm = height_mm * iw / ih
     elif height_mm <= 0 and width_mm > 0:
@@ -101,6 +109,9 @@ def generate():
     cfg.hoop                  = HoopConfig(w=hoop_w, h=hoop_h)
     cfg.pull_compensation_mm  = pull_comp
     cfg.trim_jumps            = trim_jumps
+    cfg.thread_brand          = thread_brand
+    # Inkscape --batch-process crashes on this system; use pure-Python engine
+    cfg.use_inkstitch         = False
 
     # ── Run pipeline ──────────────────────────────────────────────────────────
     try:
@@ -116,6 +127,21 @@ def generate():
                 "Kontur/esikleme kontrol edin veya gorsel boyutunu buyutin."
             )
         }), 422
+
+    # ── Thread matching ───────────────────────────────────────────────────────
+    from src.threads import match_palette
+    thread_matches = match_palette(result.palette, cfg.thread_brand)
+    thread_list = [
+        {
+            "sira":       i + 1,
+            "iplik_kodu": m.thread_code,
+            "iplik_adi":  m.thread_name,
+            "bulunan_hex": "#{:02x}{:02x}{:02x}".format(*m.found_rgb),
+            "iplik_hex":   "#{:02x}{:02x}{:02x}".format(*m.thread_rgb),
+            "delta_e":     round(m.delta_e, 1),
+        }
+        for i, m in enumerate(thread_matches)
+    ]
 
     # ── Encode preview as base64 ──────────────────────────────────────────────
     preview_b64 = base64.b64encode(result.preview_path.read_bytes()).decode()
@@ -145,12 +171,17 @@ def generate():
         _json.dumps(stitch_seq), encoding="utf-8"
     )
 
+    warnings_all = list(result.validation.warnings)
+    if complexity_warning:
+        warnings_all.insert(0, complexity_warning)
+
     return jsonify({
         "job_id":        job_id,
         "preview_b64":   preview_b64,
         "stitch_seq":    stitch_seq,
         "palette":       list(result.palette),
         "bounds_mm":     [minx, miny, maxx, maxy],
+        "thread_list":   thread_list,
         "stats": {
             "total_stitches": result.total_stitches,
             "n_color_blocks": result.n_color_blocks,
@@ -160,7 +191,7 @@ def generate():
             "target_h_mm":   round(height_mm, 1),
             "validation_ok": result.validation.ok,
             "errors":        result.validation.errors,
-            "warnings":      result.validation.warnings,
+            "warnings":      warnings_all,
         },
     })
 
