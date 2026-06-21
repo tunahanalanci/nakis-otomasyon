@@ -207,20 +207,19 @@ def _generate_blocks(
 ) -> list[StitchBlock]:
     """Generate StitchBlocks for every polygon in every colour.
 
-    Stitch type is chosen per-polygon using distance-transform stroke width:
-    * width < cfg.running_max_width_mm → running stitch (outline trace)
-    * width < cfg.satin_max_width_mm   → satin stitch, fallback fill
-    * else                             → tatami fill with underlay
+    Policy (cfg.text_use_centerline=False, default):
+      1. Tatami fill for every polygon — complete, reliable coverage.
+      2. Satin column fallback only when fill produces no points
+         (polygon too thin for fill scan-lines to intersect).
+      Running/centerline is disabled unless cfg.text_use_centerline=True,
+      because outline-tracing creates fragmented-looking letters.
     """
-    from src.stitch.fill    import generate as _fill    # noqa: PLC0415
-    from src.stitch.running import generate_outline as _running  # noqa: PLC0415
-    from src.stitch.satin   import generate as _satin, width_at as _mbr_width  # noqa: PLC0415
+    from src.stitch.fill  import generate as _fill   # noqa: PLC0415
+    from src.stitch.satin import generate as _satin  # noqa: PLC0415
     from dataclasses import replace as _dc_replace
 
-    # Satin config with relaxed width gate; DT routing already screened shape size.
-    wide_satin_cfg = _dc_replace(cfg.satin, min_width_mm=0.0, max_width_mm=50.0)
-    # Half-spacing fill for complex thin shapes (curves, C-arcs) where satin zigzags poorly.
-    tight_fill_cfg = _dc_replace(cfg.fill, spacing_mm=max(0.15, cfg.fill.spacing_mm * 0.5))
+    # Satin fallback: relaxed width gate so truly thin shapes can be caught.
+    fallback_satin_cfg = _dc_replace(cfg.satin, min_width_mm=0.0, max_width_mm=50.0)
 
     blocks: list[StitchBlock] = []
 
@@ -229,28 +228,21 @@ def _generate_blocks(
             if poly.is_empty or not poly.is_valid:
                 continue
 
-            w_mm  = _stroke_width_mm(poly)          # inscribed-circle diameter
-            mbr_w = _mbr_width(poly)                # MBR short side (bounding box)
+            # ── Primary: tatami fill ──────────────────────────────────────────
+            pts = _fill(
+                poly, cfg.fill,
+                stitch_mm            = _FILL_STITCH_MM,
+                pull_compensation_mm = cfg.pull_compensation_mm,
+            )
 
-            if w_mm < cfg.running_max_width_mm:
+            # ── Fallback: satin column for shapes fill scan-lines miss ────────
+            if not pts:
+                pts = _satin(poly, fallback_satin_cfg)
+
+            # ── Centerline/running: opt-in only (default OFF) ─────────────────
+            if not pts and cfg.text_use_centerline:
+                from src.stitch.running import generate_outline as _running  # noqa: PLC0415
                 pts = _running(poly, cfg)
-            elif w_mm < cfg.satin_max_width_mm:
-                if mbr_w < cfg.satin_max_width_mm:
-                    # Simple elongated shape (l, i, t stems): MBR confirms narrow → satin
-                    pts = _satin(poly, wide_satin_cfg)
-                    if not pts:
-                        pts = _fill(poly, tight_fill_cfg,
-                                    stitch_mm=_FILL_STITCH_MM,
-                                    pull_compensation_mm=cfg.pull_compensation_mm)
-                else:
-                    # Complex curve (G arc, e bowl): DT thin but MBR wide → tight fill
-                    pts = _fill(poly, tight_fill_cfg,
-                                stitch_mm=_FILL_STITCH_MM,
-                                pull_compensation_mm=cfg.pull_compensation_mm)
-            else:
-                pts = _fill(poly, cfg.fill,
-                            stitch_mm=_FILL_STITCH_MM,
-                            pull_compensation_mm=cfg.pull_compensation_mm)
 
             if pts:
                 blocks.append(StitchBlock(color_idx=color_idx, points=pts))
