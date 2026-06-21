@@ -182,6 +182,7 @@ def generate():
         "palette":       list(result.palette),
         "bounds_mm":     [minx, miny, maxx, maxy],
         "thread_list":   thread_list,
+        "has_svg":       result.svg_path is not None and result.svg_path.exists(),
         "stats": {
             "total_stitches": result.total_stitches,
             "n_color_blocks": result.n_color_blocks,
@@ -217,6 +218,11 @@ def download(job_id: str, filetype: str):
         if files:
             return send_file(str(files[0]), as_attachment=True,
                              download_name="onizleme.png")
+    elif filetype == "svg":
+        files = sorted(job_dir.glob("*.svg"))
+        if files:
+            return send_file(str(files[0]), as_attachment=True,
+                             download_name="nakis_tasarim.svg")
 
     return jsonify({"error": "Dosya bulunamadi."}), 404
 

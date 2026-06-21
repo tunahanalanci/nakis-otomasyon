@@ -40,6 +40,7 @@ class PipelineResult:
     validation:        ValidationReport
     palette:           list[tuple[int, int, int]]
     blocks:            list[StitchBlock]   # stitch data in Y-down mm (for render/animation)
+    svg_path:          Path | None = None  # Ink/Stitch-compatible SVG for manual editing
 
 
 def run(
@@ -115,6 +116,16 @@ def run(
     validation   = validate(export_stats.dst_path, cfg)
     preview_path = render_preview(blocks, palette, out_dir / f"{stem}_preview.png")
 
+    # ── SVG for manual editing in Inkscape + Ink/Stitch ───────────────────────
+    svg_path: Path | None = None
+    try:
+        from src.inkstitch_engine import build_svg  # noqa: PLC0415
+        svg_path = out_dir / f"{stem}.svg"
+        build_svg(masks, thread_matches, px_per_mm,
+                  cfg.width_mm, cfg.height_mm, cfg, svg_path)
+    except Exception:
+        svg_path = None
+
     if usb_path is not None:
         from src.usb_writer import write_to_usb  # noqa: PLC0415
         write_to_usb(export_stats.dst_path, color_report_path, usb_path,
@@ -130,6 +141,7 @@ def run(
         validation        = validation,
         palette           = palette,
         blocks            = blocks,
+        svg_path          = svg_path,
     )
 
 
@@ -182,6 +194,7 @@ def _run_inkstitch(
         validation        = validation,
         palette           = palette,
         blocks            = [],   # Ink/Stitch engine; blok listesi DST'den
+        svg_path          = svg_path,
     )
 
 
