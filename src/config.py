@@ -44,6 +44,7 @@ class Config:
     use_inkstitch: bool = True    # aktif motor: True=Ink/Stitch, False=legacy
     satin_max_width_mm: float = 3.5   # genislik < bu → satin
     running_max_width_mm: float = 0.5  # genislik < bu → running_stitch
+    text_use_centerline: bool = False  # varsayilan KAPALI — fill-first politikasi
     thread_brand: str = "isacord.json"  # iplik katalogu dosya adi
 
 
@@ -74,5 +75,6 @@ def load(path: str | Path) -> Config:
         use_inkstitch=raw.get("use_inkstitch", True),
         satin_max_width_mm=raw.get("satin_max_width_mm", 3.5),
         running_max_width_mm=raw.get("running_max_width_mm", 0.5),
+        text_use_centerline=raw.get("text_use_centerline", False),
         thread_brand=raw.get("thread_brand", "isacord.json"),
     )
