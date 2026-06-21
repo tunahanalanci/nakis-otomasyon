@@ -16,6 +16,7 @@ from src.config import Config, FillConfig, HoopConfig, SatinConfig, load
 from src.pipeline import run as pipeline_run
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32 MB upload limit
 
 DEFAULT_CONFIG = Path(__file__).parent / "config" / "default.json"
 JOBS_DIR       = Path(__file__).parent / "jobs"
