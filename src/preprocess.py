@@ -11,7 +11,7 @@ from PIL import Image
 from src.config import Config
 
 # ── Module-level constants ────────────────────────────────────────────────────
-MIN_PX_PER_MM: float = 10.0  # minimum output resolution
+MIN_PX_PER_MM: float = 16.0  # minimum output resolution
 ALPHA_THRESH:  int   = 128   # alpha < this → background
 MEDIAN_KSIZE:  int   = 3     # median blur kernel size (must be odd)
 BG_BRIGHT_THRESH: int = 240  # RGB pixels with all channels > this = near-white background

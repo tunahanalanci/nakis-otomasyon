@@ -107,8 +107,8 @@ def run(
         )
 
     # ── Legacy path ───────────────────────────────────────────────────────────
-    polygons_by_color = vectorize_masks(masks, px_per_mm, min_area_mm2=1.0)
-    blocks = _generate_blocks(polygons_by_color, cfg)
+    polygons_by_color = vectorize_masks(masks, px_per_mm, simplify_px=0.5, min_area_mm2=0.5)
+    blocks = _generate_blocks(polygons_by_color, cfg, px_per_mm)
     blocks = optimize(blocks, cfg)
     export_stats: ExportStats = _export_dst(blocks, palette, cfg, out_dir, stem=stem)
     color_report_path = out_dir / "renk_sirasi.txt"
@@ -203,16 +203,24 @@ def _run_inkstitch(
 def _generate_blocks(
     polygons_by_color: list[list],
     cfg: Config,
+    px_per_mm: float = 10.0,
 ) -> list[StitchBlock]:
     """Generate StitchBlocks for every polygon in every colour.
 
-    Selection logic per polygon:
-    * Try satin — accepted when width falls within [satin.min_width_mm,
-      satin.max_width_mm] (``satin.generate`` returns [] otherwise).
-    * Fall back to fill (tatami) with underlay if *cfg.fill.underlay* is set.
+    Stitch type is chosen per-polygon using distance-transform stroke width:
+    * width < cfg.running_max_width_mm → running stitch (outline trace)
+    * width < cfg.satin_max_width_mm   → satin stitch, fallback fill
+    * else                             → tatami fill with underlay
     """
-    from src.stitch.fill  import generate as _fill   # noqa: PLC0415
-    from src.stitch.satin import generate as _satin  # noqa: PLC0415
+    from src.stitch.fill    import generate as _fill    # noqa: PLC0415
+    from src.stitch.running import generate_outline as _running  # noqa: PLC0415
+    from src.stitch.satin   import generate as _satin, width_at as _mbr_width  # noqa: PLC0415
+    from dataclasses import replace as _dc_replace
+
+    # Satin config with relaxed width gate; DT routing already screened shape size.
+    wide_satin_cfg = _dc_replace(cfg.satin, min_width_mm=0.0, max_width_mm=50.0)
+    # Half-spacing fill for complex thin shapes (curves, C-arcs) where satin zigzags poorly.
+    tight_fill_cfg = _dc_replace(cfg.fill, spacing_mm=max(0.15, cfg.fill.spacing_mm * 0.5))
 
     blocks: list[StitchBlock] = []
 
@@ -221,18 +229,62 @@ def _generate_blocks(
             if poly.is_empty or not poly.is_valid:
                 continue
 
-            pts = _satin(poly, cfg.satin)
-            if not pts:
-                pts = _fill(
-                    poly, cfg.fill,
-                    stitch_mm            = _FILL_STITCH_MM,
-                    pull_compensation_mm = cfg.pull_compensation_mm,
-                )
+            w_mm  = _stroke_width_mm(poly)          # inscribed-circle diameter
+            mbr_w = _mbr_width(poly)                # MBR short side (bounding box)
+
+            if w_mm < cfg.running_max_width_mm:
+                pts = _running(poly, cfg)
+            elif w_mm < cfg.satin_max_width_mm:
+                if mbr_w < cfg.satin_max_width_mm:
+                    # Simple elongated shape (l, i, t stems): MBR confirms narrow → satin
+                    pts = _satin(poly, wide_satin_cfg)
+                    if not pts:
+                        pts = _fill(poly, tight_fill_cfg,
+                                    stitch_mm=_FILL_STITCH_MM,
+                                    pull_compensation_mm=cfg.pull_compensation_mm)
+                else:
+                    # Complex curve (G arc, e bowl): DT thin but MBR wide → tight fill
+                    pts = _fill(poly, tight_fill_cfg,
+                                stitch_mm=_FILL_STITCH_MM,
+                                pull_compensation_mm=cfg.pull_compensation_mm)
+            else:
+                pts = _fill(poly, cfg.fill,
+                            stitch_mm=_FILL_STITCH_MM,
+                            pull_compensation_mm=cfg.pull_compensation_mm)
 
             if pts:
                 blocks.append(StitchBlock(color_idx=color_idx, points=pts))
 
     return blocks
+
+
+def _stroke_width_mm(poly) -> float:
+    """Distance-transform estimate of stroke width: diameter of largest inscribed circle.
+
+    Rasterises *poly* at 10 px/mm (sufficient to distinguish 0.3–10 mm range),
+    fills holes, runs OpenCV distanceTransform, returns 2 × max_radius_mm.
+    """
+    import cv2  # noqa: PLC0415
+    import numpy as np  # noqa: PLC0415
+    _R = 10.0  # raster resolution for width estimation
+    ext = np.array(poly.exterior.coords, dtype=np.float64)
+    px = np.round(ext * _R).astype(np.int32)
+    x0, y0 = int(px[:, 0].min()), int(px[:, 1].min())
+    pad = 2
+    px -= [x0 - pad, y0 - pad]
+    W = int(px[:, 0].max()) + pad + 1
+    H = int(px[:, 1].max()) + pad + 1
+    if W < 1 or H < 1:
+        return 0.0
+    canvas = np.zeros((H, W), dtype=np.uint8)
+    cv2.fillPoly(canvas, [px.reshape(-1, 1, 2)], 255)
+    for ring in poly.interiors:
+        hole = np.round(np.array(ring.coords, dtype=np.float64) * _R).astype(np.int32)
+        hole -= [x0 - pad, y0 - pad]
+        cv2.fillPoly(canvas, [hole.reshape(-1, 1, 2)], 0)
+    dist = cv2.distanceTransform(canvas, cv2.DIST_L2, 5)
+    r = float(np.max(dist))
+    return 2.0 * r / _R if r > 0 else 0.0
 
 
 def _save_quantised_png(

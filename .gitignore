@@ -19,6 +19,10 @@ out/*
 !out/ui_screenshot.png
 !out/surec.gif
 !out/anim_frames.png
+!out/logo_100mm_preview.png
+!out/compare_letters.png
+!out/dbg_width_map.png
+!out/dbg_stitch_types.png
 *.dst
 *.pes
 *.jef
